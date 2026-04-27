@@ -1,0 +1,33 @@
+{
+  "name": "@uilibrary/tokens",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./css": {
+      "default": "./dist/tokens.css"
+    },
+    "./fonts": {
+      "default": "./src/fonts.css"
+    },
+    "./fonts-base": {
+      "default": "./src/fonts-base.css"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "vite build && tsc --emitDeclarationOnly && cp src/tokens.css dist/tokens.css",
+    "dev": "vite build --watch",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "typescript": "^5.7",
+    "vite": "^6"
+  }
+}
