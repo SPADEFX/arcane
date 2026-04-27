@@ -1,0 +1,125 @@
+.ds-select {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  height: 28px;
+  padding: 0 10px;
+  background: var(--ds-color-surface-control);
+  border: 1px solid var(--ds-border-divider);
+  border-radius: var(--ds-radius-icon);
+  color: var(--ds-color-text-primary);
+  font-family: var(--ds-font-mono);
+  font-size: 13px;
+  cursor: pointer;
+  outline: none;
+  text-align: left;
+  transition: border-color 0.16s var(--ease-out-cubic),
+    background-color 0.16s var(--ease-out-cubic);
+}
+
+.ds-select:hover {
+  border-color: var(--ds-border-hover);
+  background: var(--ds-color-surface-hover);
+}
+
+.ds-select.open {
+  border-color: var(--ds-border-hover);
+}
+
+.ds-select-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ds-select-caret {
+  color: var(--ds-color-text-muted);
+  transition: transform 0.16s var(--ease-out-cubic);
+  flex-shrink: 0;
+}
+
+.ds-select.open .ds-select-caret {
+  transform: rotate(180deg);
+}
+
+.ds-select-pop {
+  position: fixed;
+  z-index: 10000;
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--ds-color-glass-panel);
+  border: 1px solid var(--ds-border-panel);
+  box-shadow: var(--ds-shadow-panel-dark);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  animation: ds-select-in 0.12s var(--ease-out-cubic);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+@keyframes ds-select-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.ds-select-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  padding: 0 10px 0 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ds-color-text-secondary);
+  font-family: var(--ds-font-mono);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.08s var(--ease-out-cubic),
+    color 0.08s var(--ease-out-cubic);
+}
+
+.ds-select-opt.active {
+  background: var(--ds-color-surface-hover);
+  color: var(--ds-color-text-primary);
+}
+
+.ds-select-opt.selected {
+  color: var(--ds-color-text-primary);
+}
+
+.ds-select-opt:hover {
+  background: var(--ds-color-surface-hover);
+  color: var(--ds-color-text-primary);
+}
+
+.ds-select-check {
+  display: inline-flex;
+  width: 14px;
+  height: 14px;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--ds-color-accent);
+}
+
+.ds-select-opt-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -1,0 +1,981 @@
+/* Shared motion-tile chrome — each motion fills a 1:1 tile and loops forever. */
+
+.m-tile-stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #0d0d12;
+  isolation: isolate;
+}
+
+/* ─── 1. Letter stagger ─ in with overshoot, out with smooth ease ─ */
+.m-letter-stagger {
+  display: flex;
+  gap: 1px;
+  font-family: var(--ds-font-sans);
+  font-weight: 700;
+  font-size: 28px;
+  letter-spacing: 0.04em;
+  color: #fff;
+}
+.m-letter-stagger span {
+  display: inline-block;
+  animation:
+    m-letter-in 1.2s cubic-bezier(0.2, 1.83, 0.39, 0.62) both,
+    m-letter-out 0.5s cubic-bezier(0.7, 0.01, 0.3, 0.98) forwards;
+  animation-iteration-count: infinite, infinite;
+  animation-duration: 2.8s, 2.8s;
+}
+@keyframes m-letter-in {
+  0% { opacity: 0; transform: translateY(18px) scale(0.4); }
+  20%, 65% { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(0) scale(1); }
+}
+@keyframes m-letter-out {
+  0%, 65% { transform: translateY(0); }
+  100% { transform: translateY(-18px); opacity: 0; }
+}
+
+/* ─── 2. Triangle wipe (clip-path reveal) ───────────────────────── */
+.m-blur-reveal {
+  font-family: var(--ds-font-sans);
+  font-weight: 700;
+  font-size: 30px;
+  letter-spacing: -0.01em;
+  color: #fff;
+  position: relative;
+  padding: 6px 4px;
+}
+.m-blur-reveal span {
+  display: inline-block;
+  animation: m-tri-wipe 2.6s cubic-bezier(0.72, 0.01, 0.2, 1.01) infinite;
+  clip-path: polygon(100% 0, 100% 0, 100% 100%, 100% 100%);
+}
+@keyframes m-tri-wipe {
+  0% { clip-path: polygon(100% 0, 100% 0, 100% 100%, 100% 100%); }
+  28%, 68% { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%); }
+  100% { clip-path: polygon(0 0, 0 0, 0 100%, 0 100%); }
+}
+
+/* ─── 3. Scale pop ──────────────────────────────────────────────── */
+.m-scale-pop .m-card {
+  width: 64px;
+  height: 80px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #ff5470, #6e5cff);
+  animation: m-pop 2s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+}
+@keyframes m-pop {
+  0% { transform: scale(0.2); opacity: 0; }
+  35% { transform: scale(1.08); opacity: 1; }
+  60% { transform: scale(1); }
+  100% { transform: scale(0.2); opacity: 0; }
+}
+
+/* ─── 4. Stack rise ─────────────────────────────────────────────── */
+.m-stack-rise {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 70%;
+}
+.m-stack-rise .m-bar {
+  height: 14px;
+  border-radius: 7px;
+  background: #fff;
+  opacity: 0;
+  transform: translateY(20px);
+  animation: m-rise 2.6s cubic-bezier(0.2, 0.9, 0.2, 1) infinite;
+}
+.m-stack-rise .m-bar:nth-child(2) { width: 80%; align-self: flex-end; background: #ff5470; }
+.m-stack-rise .m-bar:nth-child(3) { width: 60%; background: #6e5cff; }
+@keyframes m-rise {
+  0% { opacity: 0; transform: translateY(20px); }
+  30%, 75% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-20px); }
+}
+
+/* ─── 5. Pill morph ─────────────────────────────────────────────── */
+.m-pill-morph .m-pill {
+  width: 88px;
+  height: 36px;
+  background: #ffd166;
+  border-radius: 18px;
+  animation: m-morph 2.4s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+@keyframes m-morph {
+  0% { width: 88px; height: 36px; border-radius: 18px; background: #ffd166; }
+  50% { width: 56px; height: 56px; border-radius: 50%; background: #ff5470; transform: rotate(180deg); }
+  100% { width: 88px; height: 36px; border-radius: 18px; background: #ffd166; transform: rotate(360deg); }
+}
+
+/* ─── 6. Digit flip ─────────────────────────────────────────────── */
+.m-digit-flip {
+  height: 56px;
+  width: 44px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  background: #18181f;
+}
+.m-digit-col {
+  display: flex;
+  flex-direction: column;
+  font-family: var(--ds-font-mono);
+  font-weight: 600;
+  font-size: 38px;
+  color: #fff;
+  line-height: 56px;
+  text-align: center;
+  animation: m-digit 4s steps(10) infinite;
+}
+.m-digit-col span { display: block; height: 56px; }
+@keyframes m-digit {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-560px); }
+}
+
+/* ─── 7. Check draw ─────────────────────────────────────────────── */
+.m-check-draw .m-check-ring {
+  fill: none;
+  stroke: #4ade80;
+  stroke-width: 3;
+  stroke-dasharray: 126;
+  stroke-dashoffset: 126;
+  animation: m-ring 2.6s cubic-bezier(0.2, 0.9, 0.2, 1) infinite;
+}
+.m-check-draw .m-check-tick {
+  fill: none;
+  stroke: #4ade80;
+  stroke-width: 3.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 32;
+  stroke-dashoffset: 32;
+  animation: m-tick 2.6s cubic-bezier(0.2, 0.9, 0.2, 1) infinite 0.4s;
+}
+@keyframes m-ring {
+  0% { stroke-dashoffset: 126; }
+  35%, 75% { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: 126; }
+}
+@keyframes m-tick {
+  0% { stroke-dashoffset: 32; }
+  30%, 75% { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: 32; }
+}
+
+/* ─── 8. Ripple burst ───────────────────────────────────────────── */
+.m-ripple-burst {
+  position: relative;
+  width: 16px;
+  height: 16px;
+}
+.m-ripple-burst::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: #fff;
+}
+.m-ripple-burst .m-ripple {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.7);
+  opacity: 0;
+  animation: m-ripple 1.6s cubic-bezier(0, 0.6, 0.4, 1) infinite;
+}
+@keyframes m-ripple {
+  0% { transform: scale(1); opacity: 0.9; }
+  80%, 100% { transform: scale(7); opacity: 0; }
+}
+
+/* ─── 9. Multi-dot loader ─ staggered pulse on a centered grid ─── */
+.m-split-reveal {
+  position: relative;
+  width: 80px;
+  height: 80px;
+}
+.m-split-reveal .m-split-top,
+.m-split-reveal .m-split-bot {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 6px;
+}
+.m-split-reveal .m-split-top { font-size: 0; color: transparent; }
+.m-split-reveal .m-split-bot { display: none; }
+.m-split-reveal .m-split-top::before,
+.m-split-reveal .m-split-top::after {
+  content: "";
+}
+.m-split-reveal .m-split-top {
+  background:
+    radial-gradient(circle, #fff 50%, transparent 52%) 0 0 / calc(33.33% - 4px) calc(33.33% - 4px),
+    radial-gradient(circle, #ff5470 50%, transparent 52%) 50% 0 / calc(33.33% - 4px) calc(33.33% - 4px),
+    radial-gradient(circle, #ffd166 50%, transparent 52%) 100% 0 / calc(33.33% - 4px) calc(33.33% - 4px),
+    radial-gradient(circle, #6e5cff 50%, transparent 52%) 0 50% / calc(33.33% - 4px) calc(33.33% - 4px),
+    radial-gradient(circle, #fff 50%, transparent 52%) 50% 50% / calc(33.33% - 4px) calc(33.33% - 4px),
+    radial-gradient(circle, #ff5470 50%, transparent 52%) 100% 50% / calc(33.33% - 4px) calc(33.33% - 4px),
+    radial-gradient(circle, #ffd166 50%, transparent 52%) 0 100% / calc(33.33% - 4px) calc(33.33% - 4px),
+    radial-gradient(circle, #6e5cff 50%, transparent 52%) 50% 100% / calc(33.33% - 4px) calc(33.33% - 4px),
+    radial-gradient(circle, #fff 50%, transparent 52%) 100% 100% / calc(33.33% - 4px) calc(33.33% - 4px);
+  background-repeat: no-repeat;
+  animation: m-dot-grid 0.95s cubic-bezier(0.82, 0.01, 0.28, 0.99) infinite;
+}
+@keyframes m-dot-grid {
+  0%, 100% { transform: scale(0.6); opacity: 0.3; }
+  50% { transform: scale(1); opacity: 1; }
+}
+
+/* ─── 10. Squish bounce ─────────────────────────────────────────── */
+.m-squish {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 24px;
+  box-sizing: border-box;
+}
+.m-squish .m-blob {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #fff, #ff5470 70%);
+  animation: m-squish 1.6s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+  transform-origin: bottom center;
+}
+@keyframes m-squish {
+  0% { transform: translateY(0) scale(1, 1); }
+  20% { transform: translateY(0) scale(1.25, 0.75); }
+  50% { transform: translateY(-60px) scale(0.85, 1.15); }
+  80% { transform: translateY(0) scale(1.2, 0.8); }
+  100% { transform: translateY(0) scale(1, 1); }
+}
+
+/* ─── 11. Slide swap ────────────────────────────────────────────── */
+.m-slide-swap {
+  position: relative;
+  font-family: var(--ds-font-sans);
+  font-weight: 700;
+  font-size: 26px;
+  color: #fff;
+  height: 1em;
+  width: 80px;
+  text-align: center;
+  overflow: hidden;
+}
+.m-slide-swap span {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  animation: m-slide-swap 4.5s cubic-bezier(0.78, 0.01, 0.19, 0.98) infinite;
+}
+.m-slide-swap span:nth-child(1) { animation-delay: 0s; color: #ff5470; }
+.m-slide-swap span:nth-child(2) { animation-delay: 1.5s; color: #ffd166; }
+.m-slide-swap span:nth-child(3) { animation-delay: 3s; color: #6e5cff; }
+@keyframes m-slide-swap {
+  0% { transform: translateY(100%); opacity: 0; }
+  6%, 28% { transform: translateY(0); opacity: 1; }
+  34%, 100% { transform: translateY(-100%); opacity: 0; }
+}
+
+/* ─── 12. Orbit dots ────────────────────────────────────────────── */
+.m-orbit {
+  position: relative;
+  width: 64px;
+  height: 64px;
+}
+.m-orbit-dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  margin: -5px;
+  border-radius: 50%;
+  background: #fff;
+  animation: m-orbit 1.6s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+.m-orbit-dot:nth-child(2) { background: #ff5470; }
+.m-orbit-dot:nth-child(3) { background: #ffd166; }
+.m-orbit-dot:nth-child(4) { background: #6e5cff; }
+@keyframes m-orbit {
+  0% { transform: rotate(0) translateX(22px) rotate(0); }
+  100% { transform: rotate(360deg) translateX(22px) rotate(-360deg); }
+}
+
+/* ─── 13. Typewriter ────────────────────────────────────────────── */
+.m-typewriter {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--ds-font-mono);
+  font-size: 20px;
+  color: #fff;
+}
+.m-type-text {
+  display: inline-block;
+  overflow: hidden;
+  white-space: nowrap;
+  width: 0;
+  animation: m-type 3.2s steps(7, end) infinite;
+}
+.m-type-caret {
+  display: inline-block;
+  width: 2px;
+  height: 22px;
+  margin-left: 2px;
+  background: #fff;
+  animation: m-caret 0.9s step-end infinite;
+}
+@keyframes m-type {
+  0% { width: 0; }
+  40%, 70% { width: 6.5ch; }
+  100% { width: 0; }
+}
+@keyframes m-caret {
+  50% { opacity: 0; }
+}
+
+/* ─── 14. Mask wipe ─────────────────────────────────────────────── */
+.m-mask-wipe {
+  position: relative;
+  font-family: var(--ds-font-sans);
+  font-weight: 700;
+  font-size: 28px;
+  color: #fff;
+  padding: 4px 6px;
+  overflow: hidden;
+}
+.m-mask-wipe .m-wipe-bar {
+  position: absolute;
+  inset: 0;
+  background: #ff5470;
+  transform-origin: left center;
+  animation: m-wipe 2.4s cubic-bezier(0.77, 0, 0.18, 1) infinite;
+}
+@keyframes m-wipe {
+  0% { transform: scaleX(0); transform-origin: left; }
+  40% { transform: scaleX(1); transform-origin: left; }
+  40.01% { transform-origin: right; }
+  80%, 100% { transform: scaleX(0); transform-origin: right; }
+}
+
+/* ─── 15. Progress bar ──────────────────────────────────────────── */
+.m-progress {
+  width: 70%;
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+.m-progress-fill {
+  width: 40%;
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #ff5470, #6e5cff);
+  animation: m-progress 2s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+@keyframes m-progress {
+  0% { transform: translateX(-100%); width: 40%; }
+  50% { transform: translateX(80%); width: 60%; }
+  100% { transform: translateX(250%); width: 40%; }
+}
+
+/* ─── 16. Dot pulse ─────────────────────────────────────────────── */
+.m-dot-pulse {
+  display: flex;
+  gap: 10px;
+}
+.m-dot-pulse span {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  animation: m-dot-pulse 1.2s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+@keyframes m-dot-pulse {
+  0%, 80%, 100% { transform: scale(0.4); opacity: 0.4; }
+  40% { transform: scale(1); opacity: 1; }
+}
+
+/* ─── 17. Square spin ───────────────────────────────────────────── */
+.m-square-spin {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.m-square-spin .m-square {
+  width: 52px;
+  height: 52px;
+  background: #6e5cff;
+  animation: m-square-spin 2.4s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+@keyframes m-square-spin {
+  0% { transform: rotate(0) scale(1); border-radius: 6px; }
+  50% { transform: rotate(180deg) scale(0.6); border-radius: 50%; background: #ffd166; }
+  100% { transform: rotate(360deg) scale(1); border-radius: 6px; background: #6e5cff; }
+}
+
+/* ─── 18. Flip card ─────────────────────────────────────────────── */
+.m-flip-card {
+  perspective: 600px;
+  width: 70px;
+  height: 80px;
+}
+.m-flip-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  animation: m-flip 3s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+.m-flip-front,
+.m-flip-back {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backface-visibility: hidden;
+  border-radius: 10px;
+  font-family: var(--ds-font-sans);
+  font-weight: 700;
+  font-size: 28px;
+  color: #fff;
+}
+.m-flip-front { background: #ff5470; }
+.m-flip-back { background: #6e5cff; transform: rotateY(180deg); }
+@keyframes m-flip {
+  0%, 40% { transform: rotateY(0); }
+  60%, 100% { transform: rotateY(180deg); }
+}
+
+/* ─── 19. Heart beat ────────────────────────────────────────────── */
+.m-heart-beat svg {
+  transform-origin: center;
+  animation: m-heart 1.2s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+  filter: drop-shadow(0 0 8px rgba(255, 84, 112, 0.5));
+}
+@keyframes m-heart {
+  0%, 100% { transform: scale(0.9); }
+  20% { transform: scale(1.15); }
+  40% { transform: scale(0.95); }
+  60% { transform: scale(1.08); }
+}
+
+/* ─── 20. Sparkle ───────────────────────────────────────────────── */
+.m-sparkle {
+  position: relative;
+  width: 48px;
+  height: 48px;
+}
+.m-sparkle span {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 3px;
+  height: 28px;
+  margin: -14px -1.5px;
+  background: linear-gradient(180deg, #fff 0%, transparent 100%);
+  border-radius: 2px;
+  transform-origin: center;
+  animation: m-spark 1.4s cubic-bezier(0.2, 0.9, 0.2, 1) infinite;
+}
+@keyframes m-spark {
+  0%, 100% { opacity: 0; transform: rotate(var(--r, 0)) scaleY(0.2); }
+  50% { opacity: 1; transform: rotate(var(--r, 0)) scaleY(1); }
+}
+
+/* ─── Motion 01 · Loading suite (7-cell grid) ───────────────────── */
+.m-load-grid {
+  --ink: #4a4a55;
+  --paper: #d9d9e0;
+  --accent: #ffb347;
+  width: 100%;
+  height: 100%;
+  padding: 10px;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  grid-template-rows: 1fr 1fr 1fr;
+  gap: 6px;
+  background: #ecebe8;
+}
+
+.m-load-cell {
+  background: #f4f3f0;
+  border-radius: 9px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: var(--ink);
+}
+
+.m-load-cell-wide { grid-column: span 2; }
+
+/* (1) LOADING text with sliding underline */
+.m-load-text {
+  flex-direction: column;
+  gap: 4px;
+}
+.m-load-lg-letters {
+  font-family: var(--ds-font-sans);
+  font-weight: 800;
+  font-size: 20px;
+  letter-spacing: 0.04em;
+  display: inline-flex;
+  color: var(--ink);
+}
+.m-load-lg-letters span {
+  display: inline-block;
+  animation: m-load-letter 2.4s cubic-bezier(0.7, 0.01, 0.3, 0.98) infinite;
+}
+@keyframes m-load-letter {
+  0%, 10% { opacity: 0.18; }
+  28%, 58% { opacity: 1; }
+  80%, 100% { opacity: 0.18; }
+}
+.m-load-lg-underline {
+  position: absolute;
+  bottom: 24%;
+  left: 18%;
+  width: 12px;
+  height: 2px;
+  background: var(--ink);
+  animation: m-load-slider 2.4s cubic-bezier(0.7, 0.01, 0.3, 0.98) infinite;
+}
+@keyframes m-load-slider {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(60px); }
+}
+
+/* (2) Pulsing circle */
+.m-load-pulse span {
+  width: 32%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #a6a6ad;
+  animation: m-load-pulse 1.4s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+@keyframes m-load-pulse {
+  0%, 100% { transform: scale(0.5); opacity: 0.4; }
+  50% { transform: scale(1); opacity: 1; }
+}
+
+/* (3) Equalizer bars + label */
+.m-load-bars {
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+}
+.m-load-bars-row {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+  height: 26px;
+}
+.m-load-bars-row span {
+  display: block;
+  width: 2px;
+  background: var(--ink);
+  border-radius: 1px;
+  animation: m-load-bar 0.9s cubic-bezier(0.82, 0.01, 0.28, 0.99) infinite;
+  transform-origin: center;
+}
+@keyframes m-load-bar {
+  0%, 100% { height: 6px; }
+  50% { height: 24px; }
+}
+.m-load-sublabel {
+  font-family: var(--ds-font-sans);
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--ink);
+}
+
+/* (4) Hourglass with falling sand */
+.m-load-hour {
+  color: var(--ink);
+  position: relative;
+}
+.m-load-hour svg {
+  animation: m-load-flip 3.2s cubic-bezier(0.7, 0.01, 0.3, 0.98) infinite;
+  transform-origin: center;
+}
+@keyframes m-load-flip {
+  0%, 45% { transform: rotate(0); }
+  55%, 100% { transform: rotate(180deg); }
+}
+.m-load-sand {
+  position: absolute;
+  top: 58%;
+  left: 50%;
+  width: 14px;
+  height: 0;
+  margin-left: -7px;
+  background: var(--accent);
+  border-radius: 2px;
+  animation: m-load-sand 3.2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+@keyframes m-load-sand {
+  0% { height: 0; }
+  40% { height: 14px; }
+  45%, 55% { height: 14px; transform: rotate(0); }
+  100% { height: 0; }
+}
+
+/* (5) Toggle pill with sliding knob */
+.m-load-toggle {
+  flex-direction: column;
+  gap: 6px;
+}
+.m-load-toggle-pill {
+  position: relative;
+  width: 42px;
+  height: 18px;
+  border-radius: 999px;
+  background: #e3e2dd;
+  border: 1.5px solid var(--ink);
+}
+.m-load-toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--ink);
+  animation: m-load-knob 1.8s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+@keyframes m-load-knob {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(22px); }
+}
+
+/* (6) Staircase dots */
+.m-load-stair {
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  flex-direction: column;
+}
+.m-load-stair span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #a6a6ad;
+  animation: m-load-stair 1.4s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+.m-load-stair span:nth-child(1) { transform: translateX(-12px); animation-delay: 0s; }
+.m-load-stair span:nth-child(2) { transform: translateX(0); animation-delay: 0.14s; }
+.m-load-stair span:nth-child(3) { transform: translateX(12px); animation-delay: 0.28s; }
+@keyframes m-load-stair {
+  0%, 100% { opacity: 0.3; }
+  40% { opacity: 1; }
+}
+
+/* (7) Four concentric rings, highlighted one at a time */
+.m-load-rings {
+  gap: 10px;
+  justify-content: space-evenly;
+}
+.m-load-rings span {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  position: relative;
+  animation: m-load-ring 1.8s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+.m-load-rings span::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  background: var(--ink);
+}
+@keyframes m-load-ring {
+  0%, 60%, 100% { background: transparent; }
+  20%, 40% { background: #fff; }
+}
+
+/* ─── Motion 01 sub-pieces · standalone tile wrapper ────────────── */
+.m-load-std {
+  position: absolute;
+  inset: 0;
+  background: #f4f3f0;
+  color: #4a4a55;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.m-load-std.m-load-text .m-load-lg-letters {
+  font-size: 32px;
+}
+.m-load-std.m-load-text .m-load-lg-underline {
+  bottom: 30%;
+  left: 25%;
+  width: 18px;
+  height: 3px;
+  background: #4a4a55;
+}
+@keyframes m-load-slider-std {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(110px); }
+}
+.m-load-std.m-load-text .m-load-lg-underline {
+  animation-name: m-load-slider-std;
+}
+
+.m-load-std.m-load-pulse span {
+  width: 64px;
+  height: 64px;
+}
+
+.m-load-std.m-load-bars .m-load-bars-row {
+  height: 52px;
+  gap: 5px;
+}
+.m-load-std.m-load-bars .m-load-bars-row span {
+  width: 3px;
+}
+@keyframes m-load-bar-std {
+  0%, 100% { height: 10px; }
+  50% { height: 50px; }
+}
+.m-load-std.m-load-bars .m-load-bars-row span {
+  animation-name: m-load-bar-std;
+}
+.m-load-std.m-load-bars .m-load-sublabel {
+  font-size: 13px;
+}
+
+.m-load-std.m-load-toggle .m-load-toggle-pill {
+  width: 72px;
+  height: 30px;
+  border-width: 2px;
+}
+.m-load-std.m-load-toggle .m-load-toggle-knob {
+  width: 18px;
+  height: 18px;
+  top: 4px;
+  left: 4px;
+}
+@keyframes m-load-knob-std {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(38px); }
+}
+.m-load-std.m-load-toggle .m-load-toggle-knob {
+  animation-name: m-load-knob-std;
+}
+.m-load-std.m-load-toggle .m-load-sublabel {
+  font-size: 13px;
+}
+
+.m-load-std.m-load-stair {
+  gap: 6px;
+  flex-direction: column;
+}
+.m-load-std.m-load-stair span {
+  width: 11px;
+  height: 11px;
+}
+.m-load-std.m-load-stair span:nth-child(1) { transform: translateX(-20px); }
+.m-load-std.m-load-stair span:nth-child(2) { transform: translateX(0); }
+.m-load-std.m-load-stair span:nth-child(3) { transform: translateX(20px); }
+
+.m-load-std.m-load-rings {
+  flex-direction: row;
+  gap: 14px;
+}
+.m-load-std.m-load-rings span {
+  width: 28px;
+  height: 28px;
+  border-width: 2.5px;
+}
+.m-load-std.m-load-rings span::after {
+  inset: 6px;
+}
+
+/* ─── Motion 01 · original 7-loader riff ────────────────────────── */
+.m-m01r-grid {
+  --paper: #f1f1f1;
+  --ink: #111;
+  --ink-2: #555;
+  --accent: #f4ad60;
+  position: absolute;
+  inset: 0;
+  background: var(--paper);
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  grid-template-rows: 1fr 1fr 1fr;
+  grid-template-areas:
+    "a1 a2"
+    "a3 a4 a5"
+    "a6 a7 a7";
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 12px;
+  box-sizing: border-box;
+}
+.m-m01r-cell {
+  background: #fafaf6;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: var(--ink);
+  position: relative;
+}
+.m-m01r-a1 { grid-area: a1; }
+.m-m01r-a2 { grid-area: a2; }
+.m-m01r-a3 { grid-area: a3; }
+.m-m01r-a4 { grid-area: a4; }
+.m-m01r-a5 { grid-area: a5; }
+.m-m01r-a6 { grid-area: a6; }
+.m-m01r-a7 { grid-area: a7; }
+
+/* (a1) Ticker counter — three digit columns rolling */
+.m-m01r-ticker {
+  display: flex;
+  gap: 3px;
+  font-family: var(--ds-font-mono);
+  font-weight: 800;
+  font-size: 28px;
+  color: var(--ink);
+}
+.m-m01r-digit {
+  height: 32px;
+  width: 20px;
+  overflow: hidden;
+  text-align: center;
+  line-height: 32px;
+}
+.m-m01r-digit > span {
+  display: inline-block;
+  animation: m-m01r-roll 6s steps(10) infinite;
+}
+.m-m01r-digit > span > span {
+  display: block;
+  height: 32px;
+}
+.m-m01r-digit:nth-child(1) > span { animation-duration: 0.9s; }
+.m-m01r-digit:nth-child(2) > span { animation-duration: 1.4s; }
+.m-m01r-digit:nth-child(3) > span { animation-duration: 2s; }
+@keyframes m-m01r-roll {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-320px); }
+}
+
+/* (a2) Sweeping arc */
+.m-m01r-arc {
+  animation: m-m01r-arc 1.1s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+  transform-origin: center;
+}
+@keyframes m-m01r-arc {
+  to { transform: rotate(360deg); }
+}
+
+/* (a3) Progress ring filling */
+.m-m01r-ring svg circle:last-child {
+  animation: m-m01r-ring 2.4s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+@keyframes m-m01r-ring {
+  0% { stroke-dashoffset: 100; }
+  60%, 80% { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: 100; }
+}
+
+/* (a4) Bouncing balls */
+.m-m01r-balls {
+  display: flex;
+  gap: 6px;
+}
+.m-m01r-balls span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ink);
+  animation: m-m01r-bounce 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+}
+@keyframes m-m01r-bounce {
+  0%, 100% { transform: translateY(6px); opacity: 0.5; }
+  40% { transform: translateY(-6px); opacity: 1; }
+}
+
+/* (a5) Wave dots */
+.m-m01r-wave {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  height: 22px;
+}
+.m-m01r-wave span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--ink);
+  animation: m-m01r-wave 1.2s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+@keyframes m-m01r-wave {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); background: var(--accent); }
+}
+
+/* (a6) Filling bar that resets */
+.m-m01r-fill {
+  width: 70%;
+  height: 5px;
+  border-radius: 3px;
+  background: #dcdcd6;
+  overflow: hidden;
+  position: relative;
+}
+.m-m01r-fill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--ink);
+  border-radius: 3px;
+  transform-origin: left center;
+  animation: m-m01r-fill 1.6s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+@keyframes m-m01r-fill {
+  0% { transform: scaleX(0); }
+  70% { transform: scaleX(1); }
+  100% { transform: scaleX(1) translateX(0); opacity: 0; }
+}
+
+/* (a7) Sequenced color blocks */
+.m-m01r-blocks {
+  display: flex;
+  gap: 6px;
+}
+.m-m01r-blocks span {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background: #dcdcd6;
+  animation: m-m01r-block 1.6s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+@keyframes m-m01r-block {
+  0%, 70%, 100% { background: #dcdcd6; transform: scale(1); }
+  20%, 50% { background: var(--accent); transform: scale(1.15); }
+}

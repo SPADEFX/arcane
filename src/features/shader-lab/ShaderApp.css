@@ -1,0 +1,85 @@
+.app {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  background: var(--ds-color-canvas);
+  color: var(--ds-color-text-primary);
+  font-family: var(--ds-font-sans);
+  overflow: hidden;
+}
+
+.viewport-fullscreen {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.toolbar-floating {
+  position: absolute;
+  top: var(--ds-space-4);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 45;
+}
+
+.sidebar-floating {
+  position: absolute;
+  top: 72px;
+  bottom: 440px;
+  width: 260px;
+  z-index: 40;
+}
+
+.sidebar-floating.left {
+  left: var(--ds-space-4);
+}
+
+.sidebar-floating.right {
+  right: var(--ds-space-4);
+}
+
+.timeline-floating {
+  position: absolute;
+  bottom: var(--ds-space-3);
+  left: 50%;
+  z-index: 35;
+  width: 75%;
+  max-width: calc(100% - 32px);
+  max-height: calc(100% - 120px);
+  transform: translateX(-50%) translateY(0);
+  transition:
+    transform 0.24s var(--ease-out-cubic),
+    bottom 0.24s var(--ease-out-cubic);
+}
+
+.timeline-floating:has(.timeline.collapsed) {
+  bottom: 0;
+  height: 48px !important;
+}
+
+.timeline-floating:has(.timeline.collapsed) .timeline {
+  border-radius: var(--ds-radius-panel) var(--ds-radius-panel) 0 0;
+  border-bottom: 0;
+}
+
+.glass-panel {
+  background: var(--ds-color-glass-panel);
+  border: 1px solid var(--ds-border-panel);
+  border-radius: var(--ds-radius-panel);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow: var(--ds-shadow-panel-dark);
+  color: var(--ds-color-text-primary);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+@media (max-width: 899px) {
+  .sidebar-floating,
+  .timeline-floating,
+  .toolbar-floating {
+    display: none;
+  }
+}

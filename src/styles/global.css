@@ -1,0 +1,40 @@
+:root {
+  --bg: #09090b;
+  --fg: #fafafa;
+  --muted: #71717a;
+  --accent: #7c9cff;
+  --sidebar-bg: #111113;
+  --border: #27272a;
+  --card: #18181b;
+  --green: #4ade80;
+  --yellow: #fbbf24;
+  --red: #f87171;
+  --purple: #a78bfa;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: inherit; text-decoration: none; }
+button { font-family: inherit; cursor: pointer; }
+input, select, textarea { font-family: inherit; }
+
+/* Scoped reset — only for Studio layout, NOT for embedded tools */
+.studio-layout {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+.studio-main {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}

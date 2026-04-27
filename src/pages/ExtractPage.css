@@ -1,0 +1,24 @@
+.extract-page { padding: 40px; height: 100vh; display: flex; flex-direction: column; }
+.extract-header { margin-bottom: 24px; }
+.extract-header h2 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+.extract-header p { font-size: 13px; color: var(--muted); }
+.extract-form { display: flex; gap: 8px; margin-bottom: 12px; }
+.extract-input {
+  flex: 1; background: var(--card); border: 1px solid var(--border);
+  color: var(--fg); padding: 12px 16px; border-radius: 10px;
+  font-size: 14px; outline: none;
+}
+.extract-input:focus { border-color: var(--accent); }
+.extract-btn {
+  background: var(--accent); color: #0b0c0f; border: none;
+  padding: 12px 24px; border-radius: 10px; font-weight: 600;
+  font-size: 14px; cursor: pointer;
+}
+.extract-btn:disabled { opacity: 0.5; cursor: wait; }
+.extract-opts {
+  display: flex; gap: 16px; font-size: 12px; color: var(--muted); margin-bottom: 12px;
+}
+.extract-opts label { display: flex; gap: 4px; align-items: center; cursor: pointer; }
+.extract-status { font-size: 12px; color: var(--muted); margin-bottom: 12px; min-height: 18px; }
+.extract-preview { flex: 1; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); }
+.extract-preview iframe { width: 100%; height: 100%; border: none; background: #fff; }

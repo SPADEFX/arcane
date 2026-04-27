@@ -1,0 +1,61 @@
+.scene-popover {
+  position: fixed;
+  z-index: 9999;
+  width: 320px;
+  padding: 12px;
+  border-radius: var(--ds-radius-panel);
+  background: var(--ds-color-glass-panel);
+  border: 1px solid var(--ds-border-panel);
+  box-shadow: var(--ds-shadow-panel-dark);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  animation: ap-in 0.16s var(--ease-out-cubic);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sp-header {
+  padding: 4px 4px 8px;
+  border-bottom: 1px solid var(--ds-border-divider);
+  color: var(--ds-color-text-muted);
+}
+
+.sp-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sp-row {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 4px;
+  border-radius: 6px;
+}
+
+.sp-row:hover {
+  background: var(--ds-color-surface-subtle);
+}
+
+.sp-label {
+  font-family: var(--ds-font-mono);
+  font-size: 13px;
+  color: var(--ds-color-text-secondary);
+}
+
+.sp-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sp-range-group {
+  display: grid;
+  grid-template-columns: 1fr 50px;
+  gap: 6px;
+  align-items: center;
+  width: 100%;
+}

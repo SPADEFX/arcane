@@ -1,0 +1,296 @@
+.layer-manager {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.lm-header {
+  position: relative;
+  padding: 14px 14px 10px;
+  border-bottom: 1px solid var(--ds-border-divider);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.lm-add-plus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  color: var(--ds-color-text-secondary);
+  background: var(--ds-color-surface-subtle);
+  transition: background-color 0.16s var(--ease-out-cubic),
+    color 0.16s var(--ease-out-cubic),
+    transform 0.16s var(--ease-out-cubic);
+}
+
+.lm-add-plus:hover {
+  background: var(--ds-color-surface-hover);
+  color: var(--ds-color-text-primary);
+}
+
+.lm-add-plus:active {
+  transform: scale(0.95);
+}
+
+.lm-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lm-empty {
+  text-align: center;
+  padding: 30px 10px;
+  color: var(--ds-color-text-muted);
+}
+
+.lm-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 6px 10px;
+  border-radius: var(--ds-radius-control);
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--ds-color-text-muted);
+  cursor: pointer;
+  transition: background-color 0.16s var(--ease-out-cubic),
+    border-color 0.16s var(--ease-out-cubic),
+    color 0.16s var(--ease-out-cubic),
+    opacity 0.16s var(--ease-out-cubic),
+    transform 0.16s var(--ease-out-cubic);
+  text-align: left;
+  width: 100%;
+  user-select: none;
+}
+
+.lm-item.dragging {
+  opacity: 0.35;
+  transform: scale(0.98);
+}
+
+.lm-item.hidden-layer .lm-name,
+.lm-item.hidden-layer .lm-type {
+  opacity: 0.45;
+  text-decoration: line-through;
+  text-decoration-color: rgba(255, 255, 255, 0.3);
+}
+
+.lm-item {
+  position: relative;
+}
+
+.lm-item.drop-before::before,
+.lm-item.drop-after::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  height: 2px;
+  background: #fff;
+  border-radius: 1px;
+  pointer-events: none;
+  z-index: 5;
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.4);
+}
+
+.lm-item.drop-before::before {
+  top: -3px;
+}
+
+.lm-item.drop-after::after {
+  bottom: -3px;
+}
+
+.lm-item.drop-into {
+  background: var(--ds-color-surface-hover);
+  outline: 1.5px solid #fff;
+  outline-offset: -1.5px;
+  border-color: transparent;
+}
+
+.lm-nest-indicator {
+  width: 10px;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.16);
+  align-self: center;
+  margin-right: -4px;
+  flex-shrink: 0;
+}
+
+.lm-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 18px;
+  color: var(--ds-color-text-muted);
+  cursor: grab;
+  flex-shrink: 0;
+  opacity: 0.55;
+  transition: opacity 0.14s var(--ease-out-cubic);
+}
+
+.lm-item:hover .lm-drag-handle {
+  opacity: 1;
+}
+
+.lm-drag-handle:active {
+  cursor: grabbing;
+}
+
+.lm-item:hover {
+  background: var(--ds-color-surface-subtle);
+  border-color: var(--ds-border-divider);
+  color: var(--ds-color-text-secondary);
+}
+
+.lm-item.selected {
+  background: var(--ds-color-surface-active);
+  border-color: var(--ds-border-panel-strong);
+  color: var(--ds-color-text-primary);
+}
+
+.lm-eye {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ds-color-text-muted);
+  border-radius: 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color 0.14s var(--ease-out-cubic),
+    color 0.14s var(--ease-out-cubic);
+}
+
+.lm-eye:hover {
+  background: var(--ds-color-surface-hover);
+  color: var(--ds-color-text-primary);
+}
+
+.lm-eye.on {
+  color: var(--ds-color-text-primary);
+}
+
+.lm-eye.off {
+  color: var(--ds-color-text-muted);
+  opacity: 0.55;
+}
+
+.lm-name {
+  font-family: var(--ds-font-mono);
+  font-size: 13px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lm-type {
+  font-family: var(--ds-font-mono);
+  font-size: 12px;
+  color: var(--ds-color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.lm-type-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  color: var(--ds-color-text-muted);
+  flex-shrink: 0;
+  opacity: 0.75;
+  transition: color 0.14s var(--ease-out-cubic), opacity 0.14s var(--ease-out-cubic);
+}
+
+.lm-item:hover .lm-type-icon,
+.lm-item.selected .lm-type-icon {
+  color: var(--ds-color-text-secondary);
+  opacity: 1;
+}
+
+.lm-mask-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background: var(--ds-color-accent);
+  color: #000;
+  font-family: var(--ds-font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.lm-action {
+  display: inline-flex;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ds-color-text-muted);
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: background-color 0.16s var(--ease-out-cubic),
+    color 0.16s var(--ease-out-cubic);
+}
+
+.lm-action:hover {
+  background: var(--ds-color-surface-hover);
+  color: var(--ds-color-accent);
+}
+
+.lm-footer {
+  border-top: 1px solid var(--ds-border-divider);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lm-add-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.lm-add-btn {
+  padding: 6px 8px;
+  border-radius: var(--ds-radius-icon);
+  background: var(--ds-color-surface-subtle);
+  color: var(--ds-color-text-secondary);
+  font-family: var(--ds-font-mono);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  transition: background-color 0.16s var(--ease-out-cubic),
+    color 0.16s var(--ease-out-cubic);
+}
+
+.lm-add-btn:hover {
+  background: var(--ds-color-surface-hover);
+  color: var(--ds-color-text-primary);
+}
