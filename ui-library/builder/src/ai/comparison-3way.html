@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Model Comparison</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@300;400;700;900&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; background: #0a0a0a; color: #fafafa; margin: 0; }
+    .font-serif { font-family: 'Fraunces', Georgia, serif; }
+    .tab-bar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(20px);
+      background: rgba(10,10,10,0.85);
+      border-bottom: 1px solid #27272a;
+    }
+    .tab-btn {
+      transition: all 0.2s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    .tab-btn:hover {
+      background: rgba(255,255,255,0.05);
+    }
+    .tab-btn.active {
+      background: white;
+      color: black;
+    }
+    .preview-frame {
+      background: white;
+      color: black;
+      min-height: calc(100vh - 80px);
+    }
+    .panel { display: none; }
+    .panel.active { display: block; }
+  </style>
+</head>
+<body>
+  <div class="tab-bar">
+    <div class="max-w-[1800px] mx-auto px-6 py-3 flex items-center gap-2">
+      <div class="font-serif font-bold text-lg mr-6">Model Comparison</div>
+      
+        <button
+          class="tab-btn active px-5 py-2.5 rounded-full text-sm font-medium border border-zinc-700"
+          data-target="panel-gemini-flash"
+          style="--accent: #94a3b8"
+        >
+          <span class="inline-block w-2 h-2 rounded-full mr-2 align-middle" style="background: #94a3b8"></span>
+          Gemini 2.5 Flash
+          <span class="ml-2 text-xs opacity-60 font-mono">32.1s</span>
+        </button>
+      
+        <button
+          class="tab-btn  px-5 py-2.5 rounded-full text-sm font-medium border border-zinc-700"
+          data-target="panel-claude-opus"
+          style="--accent: #f97316"
+        >
+          <span class="inline-block w-2 h-2 rounded-full mr-2 align-middle" style="background: #f97316"></span>
+          Claude Opus 4.6
+          <span class="ml-2 text-xs opacity-60 font-mono">31.8s</span>
+        </button>
+      
+        <button
+          class="tab-btn  px-5 py-2.5 rounded-full text-sm font-medium border border-zinc-700"
+          data-target="panel-gemini-pro"
+          style="--accent: #10b981"
+        >
+          <span class="inline-block w-2 h-2 rounded-full mr-2 align-middle" style="background: #10b981"></span>
+          Gemini 3.1 Pro Preview
+          <span class="ml-2 text-xs opacity-60 font-mono">53.3s</span>
+        </button>
+      
+      <div class="ml-auto text-xs text-zinc-500 font-mono">
+        Click to switch · Same brief on all models
+      </div>
+    </div>
+  </div>
+
+  
+    <div class="panel active" id="panel-gemini-flash">
+      <div class="preview-frame">
+        <section class="relative isolate overflow-hidden bg-zinc-950 px-4 pt-12 pb-24 sm:px-6 lg:px-8">
+  <!-- Intentional background depth: subtle gradient and implied texture -->
+  <div class="absolute inset-0 z-0 bg-gradient-to-br from-zinc-950 to-zinc-900 opacity-90"></div>
+  <!-- A very subtle, almost imperceptible radial gradient to add depth without being a 'generic gradient' -->
+  <div class="absolute inset-0 z-0 [mask-image:radial-gradient(ellipse_at_center,white,transparent_70%)] opacity-5"></div>
+
+  <div class="relative z-10 mx-auto max-w-7xl pt-12 pb-24 lg:grid lg:grid-cols-12 lg:gap-x-24 lg:pt-24 lg:pb-48">
+    <div class="lg:col-span-7 xl:col-span-6">
+      <h1 class="font-display text-6xl font-extrabold tracking-tight text-zinc-50 sm:text-7xl md:text-8xl md:leading-[1.1] lg:text-7xl xl:text-8xl">
+        Your data. <br>
+        <span class="text-zinc-400 font-light">Unmonitored.</span>
+      </h1>
+      <p class="mt-8 max-w-xl font-sans text-xl leading-relaxed text-zinc-300 sm:mt-12 lg:text-2xl">
+        Forget invasive trackers and privacy-violating giants. Pulse gives indie hackers and small SaaS founders the actionable insights they need, without selling out their users.
+      </p>
+      <div class="mt-12 flex flex-col sm:flex-row sm:items-center gap-4">
+        <a href="#start" class="inline-flex items-center justify-center rounded-lg border border-transparent bg-amber-500 px-6 py-3 font-sans text-lg font-semibold text-amber-950 shadow-sm transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-1 hover:shadow-lg hover:shadow-amber-500/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 lg:px-8 lg:py-4">
+          Start for Free
+        </a>
+        <a href="#features" class="group inline-flex items-center rounded-lg px-4 py-3 font-sans text-lg font-medium text-zinc-300 transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950">
+          How it works
+          <svg class="ml-2 h-5 w-5 transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:translate-x-1" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 011.06 0l4.25 4.25a.75.75 0 010 1.06l-4.25 4.25a.75.75 0 01-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 010-1.06z" clip-rule="evenodd" />
+          </svg>
+        </a>
+      </div>
+    </div>
+
+    <div class="mt-16 lg:col-span-5 xl:col-span-6 lg:mt-0 lg:flex lg:flex-col lg:justify-end lg:pl-16 xl:pl-24">
+      <div class="text-right">
+        <p class="font-sans text-xs font-semibold uppercase tracking-widest text-zinc-400">Trusted by</p>
+        <p class="mt-2 font-display text-4xl font-bold text-zinc-50">
+          12,000+
+        </p>
+        <p class="mt-1 font-sans text-sm text-zinc-400">
+          Privacy-first founders
+        </p>
+        <div class="mt-6 flex justify-end gap-x-4">
+          <!-- Placeholder logos for visual rhythm and asymmetric balance -->
+          <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-zinc-800 text-xs font-medium text-zinc-400 ring-1 ring-zinc-700">A</span>
+          <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-zinc-800 text-xs font-medium text-zinc-400 ring-1 ring-zinc-700">B</span>
+          <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-zinc-800 text-xs font-medium text-zinc-400 ring-1 ring-zinc-700">C</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+      </div>
+      <div class="bg-zinc-950 border-t border-zinc-800 p-6">
+        <div class="max-w-[1800px] mx-auto flex items-center justify-between text-xs font-mono">
+          <div class="flex items-center gap-6">
+            <div>
+              <span class="text-zinc-500">Model:</span>
+              <span class="ml-2 font-bold" style="color: #94a3b8">Gemini 2.5 Flash</span>
+            </div>
+            <div>
+              <span class="text-zinc-500">Duration:</span>
+              <span class="ml-2 text-white">32.1s</span>
+            </div>
+            <div>
+              <span class="text-zinc-500">Tokens:</span>
+              <span class="ml-2 text-white">7307</span>
+            </div>
+            <div>
+              <span class="text-zinc-500">Tier:</span>
+              <span class="ml-2 text-white">Free tier</span>
+            </div>
+          </div>
+          <button onclick="document.getElementById('brief-modal').classList.toggle('hidden')" class="px-3 py-1.5 rounded border border-zinc-700 hover:bg-zinc-800 text-zinc-300">
+            View brief
+          </button>
+        </div>
+      </div>
+    </div>
+  
+    <div class="panel " id="panel-claude-opus">
+      <div class="preview-frame">
+        <section class="relative overflow-hidden bg-stone-50 text-stone-900">
+  <div class="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_1px_1px,rgba(0,0,0,0.06)_1px,transparent_0)] [background-size:24px_24px]"></div>
+  <div class="absolute top-0 right-0 -z-10 h-[420px] w-[420px] rounded-full bg-amber-200/30 blur-3xl"></div>
+
+  <div class="mx-auto max-w-7xl px-6 pt-10 pb-32 lg:px-10">
+    <nav class="flex items-center justify-between text-sm font-medium text-stone-600">
+      <div class="flex items-center gap-2">
+        <div class="h-2 w-2 rounded-full bg-amber-500"></div>
+        <span class="font-semibold tracking-tight text-stone-900">Pulse</span>
+        <span class="ml-2 rounded-full border border-stone-200 bg-white px-2 py-0.5 text-[10px] uppercase tracking-widest text-stone-500">v2.4</span>
+      </div>
+      <div class="hidden items-center gap-8 md:flex">
+        <a class="hover:text-stone-900" href="#">Docs</a>
+        <a class="hover:text-stone-900" href="#">Pricing</a>
+        <a class="hover:text-stone-900" href="#">Changelog</a>
+        <a class="rounded-full bg-stone-900 px-4 py-1.5 text-white hover:bg-stone-800" href="#">Sign in</a>
+      </div>
+    </nav>
+
+    <div class="mt-24 grid grid-cols-12 gap-6">
+      <div class="col-span-12 lg:col-span-8">
+        <div class="mb-8 flex items-center gap-3 text-[11px] font-mono uppercase tracking-[0.2em] text-stone-500">
+          <span class="h-px w-10 bg-stone-400"></span>
+          <span>001 — Analytics, without the creep</span>
+        </div>
+
+        <h1 class="font-serif text-[clamp(2.75rem,7vw,6.25rem)] font-light leading-[0.95] tracking-[-0.03em] text-stone-900" style="font-family: 'Fraunces', Georgia, serif;">
+          Stop guessing<br>
+          <span class="italic font-extralight text-stone-500">what your users</span><br>
+          actually <span class="font-extrabold not-italic">do.</span>
+        </h1>
+
+        <p class="mt-10 max-w-xl text-lg leading-relaxed text-stone-600">
+          Pulse is a <span class="text-stone-900">cookieless, GDPR-safe analytics script</span> that weighs 1.1kb, runs on the edge, and tells you which features your paying customers touch — without shipping their data to ad networks.
+        </p>
+
+        <div class="mt-12 flex flex-wrap items-center gap-8">
+          <a href="#" class="group inline-flex items-center gap-3 rounded-full bg-stone-900 px-6 py-4 text-sm font-semibold text-white shadow-[0_1px_0_0_rgba(255,255,255,0.2)_inset,0_10px_30px_-10px_rgba(0,0,0,0.4)] transition-all duration-500 hover:-translate-y-0.5 hover:bg-stone-800" style="transition-timing-function: cubic-bezier(0.32, 0.72, 0, 1);">
+            Install in 30 seconds
+            <span class="rounded-full bg-amber-400 px-2 py-0.5 font-mono text-[10px] text-stone-900">npm i pulse</span>
+          </a>
+          <a href="#" class="group inline-flex items-center gap-2 text-sm font-medium text-stone-700 hover:text-stone-900">
+            Read the architecture post
+            <span class="transition-transform duration-500 group-hover:translate-x-1" style="transition-timing-function: cubic-bezier(0.32, 0.72, 0, 1);">→</span>
+          </a>
+        </div>
+      </div>
+
+      <aside class="col-span-12 lg:col-span-4 lg:pt-40">
+        <div class="relative rounded-2xl border border-stone-200 bg-white/70 p-6 backdrop-blur-sm">
+          <div class="absolute -top-3 left-6 rounded-full bg-amber-400 px-3 py-1 font-mono text-[10px] font-semibold uppercase tracking-widest text-stone-900">live</div>
+          <div class="flex items-baseline gap-2">
+            <span class="font-serif text-5xl font-light tracking-tight text-stone-900" style="font-family: 'Fraunces', Georgia, serif;">2,418</span>
+            <span class="text-xs text-stone-500">founders shipping with Pulse</span>
+          </div>
+          <div class="mt-5 border-t border-dashed border-stone-200 pt-5">
+            <p class="text-sm italic leading-relaxed text-stone-700">
+              "I replaced GA4, Mixpanel and a 280kb bundle with one script tag. My cookie banner is gone. My PageSpeed went from 68 to 97."
+            </p>
+            <div class="mt-4 flex items-center gap-3">
+              <div class="h-7 w-7 rounded-full bg-gradient-to-br from-stone-300 to-stone-500"></div>
+              <div class="text-xs">
+                <div class="font-semibold text-stone-900">Mira Tannenbaum</div>
+                <div class="text-stone-500">Founder, Inboxly · $14k MRR</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-6 flex items-center gap-5 text-[11px] font-mono uppercase tracking-widest text-stone-400">
+          <span>Trusted by</span>
+          <span class="text-stone-600">Resend</span>
+          <span class="text-stone-600">Railway</span>
+          <span class="text-stone-600">Tinybird</span>
+        </div>
+      </aside>
+    </div>
+
+    <div class="mt-24 flex items-end justify-between border-t border-stone-200 pt-6 text-[11px] font-mono uppercase tracking-[0.2em] text-stone-500">
+      <span>SOC-2 · self-hostable · 1.1kb gzipped</span>
+      <span class="hidden md:inline">scroll ↓</span>
+    </div>
+  </div>
+</section>
+      </div>
+      <div class="bg-zinc-950 border-t border-zinc-800 p-6">
+        <div class="max-w-[1800px] mx-auto flex items-center justify-between text-xs font-mono">
+          <div class="flex items-center gap-6">
+            <div>
+              <span class="text-zinc-500">Model:</span>
+              <span class="ml-2 font-bold" style="color: #f97316">Claude Opus 4.6</span>
+            </div>
+            <div>
+              <span class="text-zinc-500">Duration:</span>
+              <span class="ml-2 text-white">31.8s</span>
+            </div>
+            <div>
+              <span class="text-zinc-500">Tokens:</span>
+              <span class="ml-2 text-white">18175</span>
+            </div>
+            <div>
+              <span class="text-zinc-500">Tier:</span>
+              <span class="ml-2 text-white">Max subscription · $0</span>
+            </div>
+          </div>
+          <button onclick="document.getElementById('brief-modal').classList.toggle('hidden')" class="px-3 py-1.5 rounded border border-zinc-700 hover:bg-zinc-800 text-zinc-300">
+            View brief
+          </button>
+        </div>
+      </div>
+    </div>
+  
+    <div class="panel " id="panel-gemini-pro">
+      <div class="preview-frame">
+        <section class="relative w-full min-h-screen bg-[#FDFCFB] text-stone-900 overflow-hidden flex flex-col justify-end pb-24 pt-48 selection:bg-amber-200 selection:text-amber-900">
+  <div class="absolute inset-0 z-0 pointer-events-none">
+    <svg class="absolute inset-0 h-full w-full opacity-[0.04]" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <pattern id="grid-pattern" width="48" height="48" patternUnits="userSpaceOnUse">
+          <path d="M.5 48V.5H48" fill="none" stroke="currentColor" stroke-width="1"></path>
+        </pattern>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#grid-pattern)"></rect>
+    </svg>
+    <div class="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMDEiLz4KPGNpcmNsZSBjeD0iMSIgY3k9IjEiIHI9IjEiIGZpbGw9IiMwMDAiIGZpbGwtb3BhY2l0eT0iMC4wMyIvPgo8L3N2Zz4=')] opacity-100 mix-blend-multiply"></div>
+  </div>
+
+  <div class="relative z-10 w-full max-w-[90rem] mx-auto px-6 md:px-12 grid grid-cols-12 gap-x-6 gap-y-24 items-end">
+    
+    <div class="col-span-12 md:col-span-8 lg:col-span-7">
+      <div class="font-['Inter',sans-serif] text-[11px] uppercase tracking-[0.2em] text-stone-400 mb-12 font-semibold flex items-center gap-3">
+        <span class="w-8 h-[1px] bg-amber-500"></span>
+        Pulse Analytics v2.0
+      </div>
+      
+      <h1 class="font-['Fraunces',serif] text-5xl md:text-7xl lg:text-[5.5rem] xl:text-[6.5rem] leading-[0.92] tracking-[-0.04em] font-light text-stone-900 mb-12">
+        GA is bloated <br/>
+        <span class="font-extrabold italic text-stone-900">spyware.</span> <br/>
+        Get pure signal.
+      </h1>
+      
+      <p class="font-['Inter',sans-serif] text-base md:text-lg text-stone-500 max-w-md leading-[1.6] mb-12">
+        A 3KB script that delivers the traffic data you actually need. No cookie banners, no GDPR headaches, no data brokering. Just fast, accurate insights.
+      </p>
+      
+      <div class="flex flex-wrap items-center gap-8">
+        <button class="group relative px-6 py-4 bg-stone-900 text-stone-50 font-['Inter',sans-serif] text-sm font-medium hover:bg-stone-800 transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 focus:ring-offset-[#FDFCFB] shadow-[0_4px_24px_rgba(0,0,0,0.08)] hover:shadow-[0_8px_48px_rgba(0,0,0,0.16)]">
+          Copy 3KB Snippet
+          <div class="absolute inset-0 border border-white/10 pointer-events-none"></div>
+        </button>
+        <a href="#" class="group font-['Inter',sans-serif] text-sm font-medium text-stone-400 hover:text-stone-900 transition-colors duration-300 flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 rounded-sm">
+          Read the manifesto 
+          <span class="group-hover:translate-x-1 transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] text-amber-500">→</span>
+        </a>
+      </div>
+    </div>
+
+    <div class="col-span-12 md:col-span-4 lg:col-span-4 lg:col-start-9 flex flex-col justify-end border-l border-stone-200 pl-6 md:pl-12 pb-2 relative">
+      <div class="absolute top-0 -left-[1px] w-[2px] h-24 bg-amber-500"></div>
+      
+      <div class="space-y-12">
+        <div class="font-['Inter',sans-serif]">
+          <div class="flex items-center gap-2 mb-3">
+            <span class="relative flex h-2 w-2">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+            </span>
+            <span class="text-[10px] text-stone-400 uppercase tracking-widest font-medium">Live Network Load</span>
+          </div>
+          <div class="text-4xl md:text-5xl font-light tracking-tighter text-stone-900 flex items-baseline gap-1">
+            42.8<span class="text-xl text-stone-400 font-normal tracking-normal">M</span>
+          </div>
+          <div class="text-xs text-stone-500 mt-3 leading-relaxed max-w-[200px]">
+            Pageviews tracked today across 1,200+ independent sites.
+          </div>
+        </div>
+
+        <div class="pt-12 border-t border-stone-100">
+          <div class="text-[10px] text-stone-400 uppercase tracking-widest font-medium mb-5">Trusted by engineers at</div>
+          <div class="flex items-center gap-5 text-stone-300">
+            <svg viewBox="0 0 100 24" class="h-4 fill-stone-800 opacity-30 hover:opacity-100 transition-opacity duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]"><path d="M12 2L2 22h20L12 2z"/></svg>
+            <svg viewBox="0 0 24 24" class="h-4 fill-stone-800 opacity-30 hover:opacity-100 transition-opacity duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]"><circle cx="12" cy="12" r="10"/></svg>
+            <svg viewBox="0 0 24 24" class="h-4 fill-stone-800 opacity-30 hover:opacity-100 transition-opacity duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]"><rect x="2" y="2" width="20" height="20" rx="4"/></svg>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+      </div>
+      <div class="bg-zinc-950 border-t border-zinc-800 p-6">
+        <div class="max-w-[1800px] mx-auto flex items-center justify-between text-xs font-mono">
+          <div class="flex items-center gap-6">
+            <div>
+              <span class="text-zinc-500">Model:</span>
+              <span class="ml-2 font-bold" style="color: #10b981">Gemini 3.1 Pro Preview</span>
+            </div>
+            <div>
+              <span class="text-zinc-500">Duration:</span>
+              <span class="ml-2 text-white">53.3s</span>
+            </div>
+            <div>
+              <span class="text-zinc-500">Tokens:</span>
+              <span class="ml-2 text-white">7994</span>
+            </div>
+            <div>
+              <span class="text-zinc-500">Tier:</span>
+              <span class="ml-2 text-white">Paid tier</span>
+            </div>
+          </div>
+          <button onclick="document.getElementById('brief-modal').classList.toggle('hidden')" class="px-3 py-1.5 rounded border border-zinc-700 hover:bg-zinc-800 text-zinc-300">
+            View brief
+          </button>
+        </div>
+      </div>
+    </div>
+  
+
+  <!-- Brief modal -->
+  <div id="brief-modal" class="hidden fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6" onclick="this.classList.add('hidden')">
+    <div class="bg-zinc-900 border border-zinc-800 rounded-2xl max-w-2xl w-full p-6" onclick="event.stopPropagation()">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-bold text-white">📋 Brief used</h3>
+        <button onclick="document.getElementById('brief-modal').classList.add('hidden')" class="text-zinc-500 hover:text-white">✕</button>
+      </div>
+      <pre class="text-xs text-zinc-400 whitespace-pre-wrap font-mono leading-relaxed">Hero section for "Pulse" — a privacy-first analytics tool for indie hackers and small SaaS founders.
+
+The brand voice is: confident, technical, slightly nerdy, no bullshit.
+Reference vibes: plausible.io, linear.app, rauno.me, fly.io.
+
+Specific requirements:
+- Asymmetric layout with intentional negative space
+- Editorial typography (mix Fraunces serif display + Inter sans body)
+- Headline must be SPECIFIC and opinionated, not "Powerful Analytics"
+- Real subhead that explains the actual value, not vague benefits
+- 1 primary CTA + 1 quiet text link (with arrow)
+- A small "social proof" element (number + tiny logos OR a quote, your call)
+- Background should feel intentional, not generic gradient
+- Use neutral palette (zinc/stone) + ONE confident accent (emerald or amber, you choose)
+- Make it feel like a real product page from a designer-founder, not AI</pre>
+    </div>
+  </div>
+
+  <script>
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        // Deactivate all
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+        // Activate clicked
+        btn.classList.add('active');
+        const target = btn.getAttribute('data-target');
+        document.getElementById(target).classList.add('active');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+    });
+  </script>
+</body>
+</html>

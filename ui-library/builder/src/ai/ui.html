@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🤖 AI Pipeline</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@300;400;700;900&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: #0a0a0a;
+      color: #fafafa;
+      margin: 0;
+    }
+    .font-serif { font-family: 'Fraunces', Georgia, serif; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+
+    .stage-card {
+      transition: all 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+      border: 1px solid #27272a;
+      background: #18181b;
+    }
+    .stage-card.pending { opacity: 0.4; }
+    .stage-card.running {
+      border-color: #f59e0b;
+      box-shadow: 0 0 0 1px #f59e0b, 0 8px 24px -8px rgba(245, 158, 11, 0.2);
+    }
+    .stage-card.done {
+      border-color: #10b981;
+    }
+    .stage-card.failed {
+      border-color: #ef4444;
+    }
+    .stage-card.retrying {
+      border-color: #f59e0b;
+    }
+
+    .pulse-dot {
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.85); }
+    }
+
+    .spinner {
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    details > summary {
+      list-style: none;
+      cursor: pointer;
+    }
+    details > summary::-webkit-details-marker {
+      display: none;
+    }
+    details[open] > summary .chevron {
+      transform: rotate(90deg);
+    }
+    .chevron {
+      transition: transform 0.2s;
+    }
+
+    pre {
+      max-height: 400px;
+      overflow: auto;
+      background: #000;
+      border: 1px solid #27272a;
+      padding: 12px;
+      border-radius: 6px;
+      font-size: 11px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .preview-iframe {
+      width: 100%;
+      min-height: 600px;
+      border: none;
+      background: white;
+      border-radius: 12px;
+    }
+
+    /* Custom scrollbar */
+    pre::-webkit-scrollbar { width: 8px; height: 8px; }
+    pre::-webkit-scrollbar-track { background: #18181b; }
+    pre::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <div class="max-w-5xl mx-auto p-6">
+    <!-- Header -->
+    <header class="mb-8">
+      <h1 class="font-serif text-4xl font-bold mb-2">🤖 AI Pipeline</h1>
+      <p class="text-zinc-400 text-sm">Multi-agent prompt refinement → generation → cross-model review</p>
+    </header>
+
+    <!-- Input -->
+    <div class="mb-8 bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+      <label class="block text-xs font-mono text-zinc-500 uppercase tracking-wider mb-3">Your Brief</label>
+      <textarea
+        id="brief"
+        rows="2"
+        placeholder="e.g. hero section with webgl animation"
+        class="w-full bg-black border border-zinc-800 rounded-lg px-4 py-3 text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-600 font-sans"
+      ></textarea>
+      <div class="flex items-center justify-between mt-4">
+        <div class="text-xs text-zinc-500 font-mono">
+          Pipeline: 6 stages · 100% Claude (Max sub) · <span class="text-emerald-400">$0/run</span>
+        </div>
+        <button
+          id="run-btn"
+          class="px-6 py-2.5 bg-white text-black rounded-full font-semibold text-sm hover:bg-zinc-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          ▶ Run Pipeline
+        </button>
+      </div>
+    </div>
+
+    <!-- Status bar -->
+    <div id="status-bar" class="hidden mb-4 px-4 py-3 bg-zinc-900 border border-zinc-800 rounded-lg flex items-center justify-between text-xs font-mono">
+      <div id="status-text" class="text-zinc-400">Ready</div>
+      <div id="status-time" class="text-zinc-500"></div>
+    </div>
+
+    <!-- Stages -->
+    <div id="stages" class="space-y-3">
+      <!-- Will be populated by JS -->
+    </div>
+
+    <!-- Final Result -->
+    <div id="result-section" class="hidden mt-8">
+      <h2 class="font-serif text-2xl font-bold mb-4">🎨 Final Component</h2>
+      <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-2">
+        <iframe id="preview" class="preview-iframe"></iframe>
+      </div>
+      <details class="mt-4">
+        <summary class="text-xs font-mono text-zinc-500 cursor-pointer hover:text-zinc-300">
+          <span class="chevron inline-block mr-2">▶</span> View final code
+        </summary>
+        <pre id="final-code" class="mt-3"></pre>
+      </details>
+    </div>
+  </div>
+
+  <script>
+    const STAGES = [
+      { id: 1, label: 'Brief Expander', icon: '📝', model: 'Claude Sonnet 4.6', color: '#fbbf24', desc: 'Expand vague brief into structured spec' },
+      { id: 2, label: 'Prompt Architect', icon: '🏗️', model: 'Claude Opus 4.6', color: '#f97316', desc: 'Write the master prompt v1' },
+      { id: 3, label: 'Critic (cross-model)', icon: '🔍', model: 'Claude Sonnet 4.6', color: '#fbbf24', desc: 'Sonnet critiques Opus prompt' },
+      { id: 4, label: 'Prompt Refiner', icon: '✨', model: 'Claude Opus 4.6', color: '#f97316', desc: 'Integrate critiques → master prompt v2' },
+      { id: 5, label: 'Generator', icon: '⚡', model: 'Claude Opus 4.6', color: '#f97316', desc: 'Generate the component code' },
+      { id: 6, label: 'Code Reviewer (cross-model)', icon: '🛡️', model: 'Claude Sonnet 4.6', color: '#fbbf24', desc: 'Sonnet reviews Opus generation' },
+    ];
+
+    const stagesContainer = document.getElementById('stages');
+    const briefInput = document.getElementById('brief');
+    const runBtn = document.getElementById('run-btn');
+    const statusBar = document.getElementById('status-bar');
+    const statusText = document.getElementById('status-text');
+    const statusTime = document.getElementById('status-time');
+    const resultSection = document.getElementById('result-section');
+    const preview = document.getElementById('preview');
+    const finalCodeEl = document.getElementById('final-code');
+
+    let runStartTime = 0;
+    let timerInterval = null;
+
+    function escapeHtml(s) {
+      if (typeof s !== 'string') s = JSON.stringify(s, null, 2);
+      return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    function renderStages() {
+      stagesContainer.innerHTML = STAGES.map(s => `
+        <div class="stage-card pending rounded-xl p-5" id="stage-${s.id}">
+          <div class="flex items-start justify-between gap-4">
+            <div class="flex-1">
+              <div class="flex items-center gap-3 mb-1">
+                <span class="text-2xl">${s.icon}</span>
+                <div>
+                  <div class="font-semibold text-sm">Stage ${s.id} · ${s.label}</div>
+                  <div class="text-xs text-zinc-500 font-mono mt-0.5">
+                    <span style="color: ${s.color}">${s.model}</span>
+                    · ${s.desc}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="status-indicator text-xs font-mono text-zinc-600">
+              waiting
+            </div>
+          </div>
+          <div class="stage-content mt-3 hidden"></div>
+        </div>
+      `).join('');
+    }
+
+    function updateStage(stageId, data) {
+      const card = document.getElementById('stage-' + stageId);
+      if (!card) return;
+
+      // Update status
+      const statusEl = card.querySelector('.status-indicator');
+      const contentEl = card.querySelector('.stage-content');
+
+      card.classList.remove('pending', 'running', 'done', 'failed', 'retrying');
+      card.classList.add(data.status);
+
+      if (data.status === 'running') {
+        statusEl.innerHTML = '<span class="text-amber-500"><span class="inline-block spinner">⟳</span> running...</span>';
+      } else if (data.status === 'retrying') {
+        statusEl.innerHTML = '<span class="text-amber-500"><span class="inline-block spinner">⟳</span> retrying...</span>';
+      } else if (data.status === 'done') {
+        statusEl.innerHTML = `<span class="text-emerald-500">✓ ${data.duration}s · ${data.tokens || 0} tok</span>`;
+        contentEl.classList.remove('hidden');
+
+        // Build collapsible content
+        let html = '';
+        if (data.input !== undefined) {
+          html += `
+            <details class="mt-3">
+              <summary class="text-xs font-mono text-zinc-500 hover:text-zinc-300">
+                <span class="chevron inline-block mr-1">▶</span> Input
+              </summary>
+              <pre class="mt-2">${escapeHtml(data.input)}</pre>
+            </details>
+          `;
+        }
+        if (data.output !== undefined) {
+          html += `
+            <details class="mt-2" open>
+              <summary class="text-xs font-mono text-zinc-500 hover:text-zinc-300">
+                <span class="chevron inline-block mr-1">▶</span> Output
+              </summary>
+              <pre class="mt-2">${escapeHtml(data.output)}</pre>
+            </details>
+          `;
+        }
+        if (data.retried) {
+          html += `
+            <div class="mt-2 px-3 py-2 bg-amber-500/10 border border-amber-500/30 rounded text-xs text-amber-300">
+              ⚠️ Retried generation due to high severity issues
+            </div>
+          `;
+        }
+        contentEl.innerHTML = html;
+      } else if (data.status === 'failed') {
+        statusEl.innerHTML = '<span class="text-red-500">✗ failed</span>';
+        contentEl.classList.remove('hidden');
+        contentEl.innerHTML = `<pre class="text-red-400">${escapeHtml(data.error || 'Unknown error')}</pre>`;
+      }
+    }
+
+    function startTimer() {
+      runStartTime = Date.now();
+      timerInterval = setInterval(() => {
+        const elapsed = ((Date.now() - runStartTime) / 1000).toFixed(1);
+        statusTime.textContent = `${elapsed}s elapsed`;
+      }, 100);
+    }
+
+    function stopTimer() {
+      if (timerInterval) clearInterval(timerInterval);
+    }
+
+    async function runPipeline() {
+      const brief = briefInput.value.trim();
+      if (!brief) {
+        alert('Please enter a brief');
+        return;
+      }
+
+      // Reset UI
+      resultSection.classList.add('hidden');
+      runBtn.disabled = true;
+      runBtn.textContent = '⟳ Running...';
+      statusBar.classList.remove('hidden');
+      statusText.textContent = `Running pipeline: "${brief}"`;
+      renderStages();
+      startTimer();
+
+      // Open SSE connection
+      const url = `/run?brief=${encodeURIComponent(brief)}`;
+      const eventSource = new EventSource(url);
+
+      eventSource.addEventListener('start', (e) => {
+        const data = JSON.parse(e.data);
+        console.log('Pipeline started:', data);
+      });
+
+      eventSource.addEventListener('stage', (e) => {
+        const { stage, data } = JSON.parse(e.data);
+        console.log(`Stage ${stage}:`, data);
+        updateStage(stage, data);
+
+        // If this is stage 6 done, show the result
+        if (stage === 6 && data.status === 'done' && data.finalCode) {
+          showResult(data.finalCode);
+        }
+      });
+
+      eventSource.addEventListener('complete', (e) => {
+        stopTimer();
+        statusText.textContent = '✅ Pipeline complete';
+        runBtn.disabled = false;
+        runBtn.textContent = '▶ Run Pipeline';
+        eventSource.close();
+      });
+
+      eventSource.addEventListener('error', (e) => {
+        stopTimer();
+        try {
+          const data = JSON.parse(e.data || '{}');
+          statusText.textContent = '❌ Error: ' + (data.message || 'Unknown');
+        } catch {
+          statusText.textContent = '❌ Connection error';
+        }
+        runBtn.disabled = false;
+        runBtn.textContent = '▶ Run Pipeline';
+        eventSource.close();
+      });
+    }
+
+    function showResult(code) {
+      resultSection.classList.remove('hidden');
+      finalCodeEl.textContent = code;
+
+      // Wrap code in full HTML doc with Tailwind + fonts and inject in iframe
+      const fullDoc = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <script src="https://cdn.tailwindcss.com"><\/script>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@300;400;700;900&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; margin: 0; }
+    .font-serif { font-family: 'Fraunces', Georgia, serif; }
+  </style>
+</head>
+<body>
+${code}
+</body>
+</html>`;
+
+      preview.srcdoc = fullDoc;
+
+      // Scroll to result
+      setTimeout(() => {
+        resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 300);
+    }
+
+    // Init
+    renderStages();
+    runBtn.addEventListener('click', runPipeline);
+
+    // Allow Cmd/Ctrl + Enter to run
+    briefInput.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        runPipeline();
+      }
+    });
+
+    // Default brief example
+    briefInput.value = 'hero section with webgl animation for a creative coding playground';
+  </script>
+</body>
+</html>

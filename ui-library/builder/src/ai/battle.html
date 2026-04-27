@@ -1,0 +1,1169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🥊 Model Battle</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@300;400;700;900&family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; background: #0a0a0a; color: #fafafa; margin: 0; }
+    .font-serif { font-family: 'Fraunces', Georgia, serif; }
+    .header-bar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(20px);
+      background: rgba(10,10,10,0.9);
+      border-bottom: 1px solid #27272a;
+    }
+    .tab-btn {
+      transition: all 0.2s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    .tab-btn:hover {
+      background: rgba(255,255,255,0.05);
+    }
+    .tab-btn.active {
+      background: white;
+      color: black;
+    }
+    .panel { display: none; }
+    .panel.active { display: block; }
+    .component-section { display: none; }
+    .component-section.active { display: block; }
+    .preview {
+      background: white;
+      color: black;
+      min-height: calc(100vh - 160px);
+    }
+  </style>
+</head>
+<body>
+  <div class="header-bar">
+    <div class="max-w-[1800px] mx-auto px-6 py-4">
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <div class="font-serif font-bold text-xl">🥊 Model Battle</div>
+          <div class="text-xs text-zinc-500 font-mono mt-1">Optimized prompts · Thinking mode · 4 generations</div>
+        </div>
+        <button onclick="document.getElementById('brief-modal').classList.toggle('hidden')" class="px-3 py-1.5 rounded border border-zinc-700 hover:bg-zinc-800 text-zinc-300 text-xs">
+          View prompts
+        </button>
+      </div>
+
+      <!-- Component tabs -->
+      <div class="flex items-center gap-2 mb-3">
+        
+          <button
+            class="component-tab active px-4 py-2 rounded-lg text-sm font-medium border border-zinc-700"
+            data-component="pricing"
+          >
+            💎 Pricing Section (Pro)
+          </button>
+        
+          <button
+            class="component-tab  px-4 py-2 rounded-lg text-sm font-medium border border-zinc-700"
+            data-component="animated"
+          >
+            🎨 Animated Hero with Three.js
+          </button>
+        
+      </div>
+
+      <!-- Model tabs (per component) -->
+      
+        <div class="model-tabs flex items-center gap-2" data-component-tabs="pricing">
+          
+            <button
+              class="model-tab tab-btn active px-4 py-2 rounded-full text-xs font-medium border border-zinc-700"
+              data-target="pricing-claude"
+              data-component-parent="pricing"
+            >
+              <span class="inline-block w-2 h-2 rounded-full mr-2 align-middle" style="background: #f97316"></span>
+              Claude Opus 4.6
+              <span class="ml-2 opacity-60 font-mono">56.5s</span>
+            </button>
+          
+            <button
+              class="model-tab tab-btn  px-4 py-2 rounded-full text-xs font-medium border border-zinc-700"
+              data-target="pricing-gemini"
+              data-component-parent="pricing"
+            >
+              <span class="inline-block w-2 h-2 rounded-full mr-2 align-middle" style="background: #10b981"></span>
+              Gemini 3.1 Pro Preview
+              <span class="ml-2 opacity-60 font-mono">60.3s</span>
+            </button>
+          
+        </div>
+      
+        <div class="model-tabs hidden items-center gap-2" data-component-tabs="animated">
+          
+            <button
+              class="model-tab tab-btn active px-4 py-2 rounded-full text-xs font-medium border border-zinc-700"
+              data-target="animated-claude"
+              data-component-parent="animated"
+            >
+              <span class="inline-block w-2 h-2 rounded-full mr-2 align-middle" style="background: #f97316"></span>
+              Claude Opus 4.6
+              <span class="ml-2 opacity-60 font-mono">76.0s</span>
+            </button>
+          
+            <button
+              class="model-tab tab-btn  px-4 py-2 rounded-full text-xs font-medium border border-zinc-700"
+              data-target="animated-gemini"
+              data-component-parent="animated"
+            >
+              <span class="inline-block w-2 h-2 rounded-full mr-2 align-middle" style="background: #10b981"></span>
+              Gemini 3.1 Pro Preview
+              <span class="ml-2 opacity-60 font-mono">55.6s</span>
+            </button>
+          
+        </div>
+      
+    </div>
+  </div>
+
+  
+    <div class="component-section active" data-component-section="pricing">
+      
+        <div class="panel active" id="pricing-claude">
+          <div class="preview">
+            <section class="relative isolate overflow-hidden bg-zinc-950 text-zinc-100 py-32 px-6 sm:px-10 font-[Inter]">
+  <style>
+    @keyframes pulse-dot { 0%,100%{opacity:.4} 50%{opacity:1} }
+    .pulse-dot{animation:pulse-dot 2.4s cubic-bezier(0.32,0.72,0,1) infinite}
+    .tier{transition:transform .6s cubic-bezier(0.16,1,0.3,1), border-color .4s ease, background-color .4s ease}
+    .tier:hover{transform:translateY(-2px);border-color:#3f3f46}
+    .tier-featured:hover{transform:translateY(-4px)}
+    .grid-bg{background-image:linear-gradient(to right,rgba(255,255,255,.03) 1px,transparent 1px),linear-gradient(to bottom,rgba(255,255,255,.03) 1px,transparent 1px);background-size:56px 56px;mask-image:radial-gradient(ellipse 80% 60% at 50% 40%,black 40%,transparent 100%)}
+    .noise{background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.6'/%3E%3C/svg%3E");opacity:.035;mix-blend-mode:overlay}
+    .toggle-pill{transition:transform .5s cubic-bezier(0.32,0.72,0,1)}
+    [data-billing="yearly"] .toggle-pill{transform:translateX(100%)}
+    [data-billing="yearly"] .price-monthly{display:none}
+    [data-billing="monthly"] .price-yearly{display:none}
+  </style>
+
+  <div class="absolute inset-0 grid-bg pointer-events-none"></div>
+  <div class="absolute inset-0 noise pointer-events-none"></div>
+
+  <div class="relative max-w-6xl mx-auto">
+
+    <!-- Header: asymmetric, left-weighted -->
+    <div class="grid grid-cols-12 gap-8 mb-20">
+      <div class="col-span-12 md:col-span-7">
+        <div class="flex items-center gap-2 mb-6 text-xs uppercase tracking-[0.2em] text-zinc-500">
+          <span class="w-1.5 h-1.5 rounded-full bg-lime-400 pulse-dot"></span>
+          Pricing · updated Apr 2026
+        </div>
+        <h2 class="font-[Fraunces] text-5xl sm:text-6xl md:text-7xl font-light tracking-tight leading-[0.95]">
+          Priced for founders<br>
+          <span class="italic font-extralight text-zinc-400">who read the invoice.</span>
+        </h2>
+      </div>
+      <div class="col-span-12 md:col-span-4 md:col-start-9 md:pt-6 flex md:items-end">
+        <p class="text-zinc-400 text-[15px] leading-relaxed max-w-xs">
+          No seat math. No "contact sales" for anything under a million visits. If Pulse costs more than your domain, we messed up.
+        </p>
+      </div>
+    </div>
+
+    <!-- Billing toggle -->
+    <div id="billing" data-billing="monthly" class="flex items-center gap-4 mb-10">
+      <button onclick="document.getElementById('billing').dataset.billing='monthly'" class="text-sm text-zinc-300 hover:text-white transition">Monthly</button>
+      <div class="relative w-14 h-7 rounded-full bg-zinc-900 border border-zinc-800 cursor-pointer" onclick="const b=document.getElementById('billing');b.dataset.billing=b.dataset.billing==='monthly'?'yearly':'monthly'">
+        <div class="toggle-pill absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-lime-400"></div>
+      </div>
+      <button onclick="document.getElementById('billing').dataset.billing='yearly'" class="text-sm text-zinc-300 hover:text-white transition flex items-center gap-2">
+        Yearly
+        <span class="text-[10px] uppercase tracking-wider text-lime-400 border border-lime-400/30 bg-lime-400/5 px-1.5 py-0.5 rounded">−20%</span>
+      </button>
+    </div>
+
+    <!-- Tiers: asymmetric 4/5/3 grid -->
+    <div class="grid grid-cols-12 gap-px bg-zinc-900 border border-zinc-900 rounded-2xl overflow-hidden">
+
+      <!-- SOLO -->
+      <div class="tier col-span-12 md:col-span-4 bg-zinc-950 p-8 md:p-10 border border-transparent">
+        <div class="flex items-baseline justify-between mb-1">
+          <h3 class="text-sm font-medium text-zinc-300">Solo</h3>
+          <span class="text-[10px] uppercase tracking-widest text-zinc-600">01</span>
+        </div>
+        <p class="text-xs text-zinc-500 mb-10 leading-relaxed">For the 1-person SaaS that doesn't need 47 dashboards.</p>
+
+        <div class="mb-2">
+          <span class="price-monthly font-[Fraunces] text-6xl font-light tracking-tight">$9</span>
+          <span class="price-yearly font-[Fraunces] text-6xl font-light tracking-tight">$7</span>
+          <span class="text-zinc-500 text-sm ml-1">/mo</span>
+        </div>
+        <p class="text-[11px] text-zinc-600 uppercase tracking-wider mb-10">billed monthly · one project</p>
+
+        <a href="#" class="block text-center text-sm text-zinc-300 border border-zinc-800 hover:border-zinc-600 hover:text-white rounded-lg py-2.5 mb-10 transition">Start free — 14 days</a>
+
+        <dl class="space-y-3 text-[13px]">
+          <div class="flex justify-between"><dt class="text-zinc-500">Pageviews</dt><dd class="text-zinc-200 tabular-nums">10,000 /mo</dd></div>
+          <div class="flex justify-between"><dt class="text-zinc-500">Custom events</dt><dd class="text-zinc-200 tabular-nums">5,000</dd></div>
+          <div class="flex justify-between"><dt class="text-zinc-500">Data retention</dt><dd class="text-zinc-200">3 years</dd></div>
+          <div class="flex justify-between"><dt class="text-zinc-500">Sites</dt><dd class="text-zinc-200">1</dd></div>
+          <div class="flex justify-between"><dt class="text-zinc-500">Funnels</dt><dd class="text-zinc-200 tabular-nums">Unlimited</dd></div>
+        </dl>
+      </div>
+
+      <!-- STUDIO — elevated: bigger span, different background, warmer border, taller -->
+      <div class="tier tier-featured col-span-12 md:col-span-5 bg-gradient-to-b from-zinc-900 to-zinc-950 p-8 md:p-12 md:-my-6 md:rounded-2xl md:border md:border-zinc-800 relative z-10 md:shadow-[0_40px_80px_-20px_rgba(0,0,0,0.6)]">
+        <div class="flex items-baseline justify-between mb-1">
+          <h3 class="text-sm font-medium text-lime-400">Studio</h3>
+          <span class="text-[10px] uppercase tracking-widest text-zinc-500">02 · what Marc picks</span>
+        </div>
+        <p class="text-xs text-zinc-400 mb-12 leading-relaxed max-w-xs">For founders running 2–3 products before breakfast. Same brain, different domains.</p>
+
+        <div class="mb-2">
+          <span class="price-monthly font-[Fraunces] text-8xl font-light tracking-tighter">$29</span>
+          <span class="price-yearly font-[Fraunces] text-8xl font-light tracking-tighter">$23</span>
+          <span class="text-zinc-500 text-sm ml-2">/mo</span>
+        </div>
+        <p class="text-[11px] text-zinc-500 uppercase tracking-wider mb-12">everything in Solo, plus the good stuff</p>
+
+        <a href="#" class="block text-center text-sm font-medium text-zinc-950 bg-lime-400 hover:bg-lime-300 rounded-lg py-3 mb-12 transition">Start free — 14 days</a>
+
+        <dl class="space-y-3.5 text-[13px]">
+          <div class="flex justify-between"><dt class="text-zinc-400">Pageviews</dt><dd class="text-white tabular-nums">250,000 /mo</dd></div>
+          <div class="flex justify-between"><dt class="text-zinc-400">Custom events</dt><dd class="text-white tabular-nums">100,000</dd></div>
+          <div class="flex justify-between"><dt class="text-zinc-400">Data retention</dt><dd class="text-white">Forever</dd></div>
+          <div class="flex justify-between"><dt class="text-zinc-400">Sites</dt><dd class="text-white tabular-nums">10</dd></div>
+          <div class="flex justify-between"><dt class="text-zinc-400">Stripe + Postgres sync</dt><dd class="text-white">Included</dd></div>
+          <div class="flex justify-between"><dt class="text-zinc-400">Slack digests</dt><dd class="text-white">Daily · weekly</dd></div>
+          <div class="flex justify-between"><dt class="text-zinc-400">API access</dt><dd class="text-white">Read + write</dd></div>
+        </dl>
+      </div>
+
+      <!-- CUSTOM -->
+      <div class="tier col-span-12 md:col-span-3 bg-zinc-950 p-8 md:p-10 border border-transparent">
+        <div class="flex items-baseline justify-between mb-1">
+          <h3 class="text-sm font-medium text-zinc-300">Custom</h3>
+          <span class="text-[10px] uppercase tracking-widest text-zinc-600">03</span>
+        </div>
+        <p class="text-xs text-zinc-500 mb-10 leading-relaxed">You hit 5M events and your CFO is asking questions.</p>
+
+        <div class="mb-2">
+          <span class="font-[Fraunces] text-5xl font-light tracking-tight italic text-zinc-300">Talk to us</span>
+        </div>
+        <p class="text-[11px] text-zinc-600 uppercase tracking-wider mb-10">usually under 24h · from a human</p>
+
+        <a href="mailto:hey@pulse.dev" class="block text-center text-sm text-zinc-300 border border-zinc-800 hover:border-zinc-600 hover:text-white rounded-lg py-2.5 mb-10 transition">hey@pulse.dev →</a>
+
+        <dl class="space-y-3 text-[13px]">
+          <div><dt class="text-zinc-500 mb-0.5">Self-hosted option</dt></div>
+          <div><dt class="text-zinc-500 mb-0.5">SSO, audit logs, SOC2</dt></div>
+          <div><dt class="text-zinc-500 mb-0.5">DPA, custom SLA</dt></div>
+          <div><dt class="text-zinc-500 mb-0.5">Migration from Plausible, Fathom, GA4</dt></div>
+        </dl>
+      </div>
+    </div>
+
+    <!-- Honest footer -->
+    <div class="mt-12 flex flex-wrap items-center justify-between gap-4 text-[12px] text-zinc-500">
+      <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span>Cancel anytime</span>
+        <span class="text-zinc-700">·</span>
+        <span>No credit card required</span>
+        <span class="text-zinc-700">·</span>
+        <span>Real humans answer support</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="w-1 h-1 rounded-full bg-lime-400 pulse-dot"></span>
+        <span>Avg. first reply: 1h 47m — by Jonas, who also writes the code</span>
+      </div>
+    </div>
+  </div>
+</section>
+          </div>
+          <div class="bg-zinc-950 border-t border-zinc-800 p-4">
+            <div class="max-w-[1800px] mx-auto flex items-center gap-6 text-xs font-mono text-zinc-400">
+              <div><span class="text-zinc-600">Component:</span> <span class="text-white">Pricing Section (Pro)</span></div>
+              <div><span class="text-zinc-600">Model:</span> <span class="font-bold" style="color: #f97316">Claude Opus 4.6</span></div>
+              <div><span class="text-zinc-600">Duration:</span> <span class="text-white">56.5s</span></div>
+              <div><span class="text-zinc-600">Tokens:</span> <span class="text-white">21283</span></div>
+              <div><span class="text-zinc-600">Cost:</span> <span class="text-white">Max sub · $0</span></div>
+            </div>
+          </div>
+        </div>
+      
+        <div class="panel " id="pricing-gemini">
+          <div class="preview">
+            <style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;1,9..144,300&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  .font-serif { font-family: 'Fraunces', serif; }
+  .font-sans { font-family: 'Inter', sans-serif; }
+  .font-mono { font-family: 'JetBrains Mono', monospace; }
+
+  /* Custom Easings */
+  .ease-spring { transition-timing-function: cubic-bezier(0.32, 0.72, 0, 1.15); }
+  .ease-out-expo { transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1); }
+
+  /* Subtle noise texture for the elevated card */
+  .bg-noise {
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.04'/%3E%3C/svg%3E");
+  }
+
+  /* Structural Grid Background */
+  .bg-grid {
+    background-size: 40px 40px;
+    background-image: linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+                      linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    background-position: top center;
+  }
+</style>
+
+<section class="relative min-h-screen bg-zinc-950 font-sans text-zinc-300 selection:bg-[#FF4500] selection:text-white py-32 overflow-hidden">
+  
+  <!-- Background Grid -->
+  <div class="absolute inset-0 bg-grid pointer-events-none [mask-image:linear-gradient(to_bottom,white_10%,transparent_90%)]"></div>
+
+  <div class="relative max-w-6xl mx-auto px-6">
+    
+    <!-- Header -->
+    <header class="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-24">
+      <div class="max-w-xl text-balance">
+        <h2 class="font-serif text-5xl md:text-6xl font-light text-zinc-50 tracking-tight leading-[1.1] mb-6">
+          Pay for data,<br/>not dashboards.
+        </h2>
+        <p class="text-zinc-400 text-lg leading-relaxed">
+          Privacy-first analytics priced for bootstrappers. 
+          No artificial seat limits. No sales calls unless you want one.
+        </p>
+      </div>
+
+      <!-- Tactile Billing Toggle -->
+      <div class="flex items-center gap-4 bg-zinc-900/50 p-1.5 rounded-full border border-zinc-800/80 backdrop-blur-sm self-start md:self-auto">
+        <button id="btn-monthly" class="relative px-5 py-2 text-sm font-medium text-white transition-colors duration-300 z-10" onclick="setBilling('monthly')">
+          Monthly
+        </button>
+        <button id="btn-yearly" class="relative px-5 py-2 text-sm font-medium text-zinc-500 transition-colors duration-300 z-10 hover:text-zinc-300" onclick="setBilling('yearly')">
+          Yearly <span class="text-[#FF4500] ml-1 opacity-80">−20%</span>
+        </button>
+        <!-- Sliding Pill -->
+        <div id="toggle-pill" class="absolute left-1.5 top-1.5 bottom-1.5 w-[90px] bg-zinc-800 rounded-full shadow-[0_1px_2px_rgba(0,0,0,0.5)] border border-zinc-700/50 transition-transform duration-500 ease-spring z-0"></div>
+      </div>
+    </header>
+
+    <!-- Asymmetric Pricing Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+      
+      <!-- ELEVATED TIER: Studio (Spans 7 columns) -->
+      <div class="lg:col-span-7 group relative flex flex-col bg-zinc-900 border border-zinc-700/50 rounded-[2rem] overflow-hidden transition-all duration-700 ease-out-expo hover:border-zinc-600 hover:shadow-[0_0_40px_-15px_rgba(255,69,0,0.15)]">
+        <div class="absolute inset-0 bg-noise mix-blend-overlay pointer-events-none"></div>
+        <div class="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#FF4500]/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
+        
+        <div class="relative p-10 md:p-12 flex-1 flex flex-col">
+          <div class="flex items-center justify-between mb-8">
+            <div class="flex items-center gap-3">
+              <div class="w-2 h-2 rounded-full bg-[#FF4500] shadow-[0_0_8px_rgba(255,69,0,0.8)] animate-pulse"></div>
+              <h3 class="text-zinc-100 font-medium tracking-wide text-sm uppercase">Studio</h3>
+            </div>
+            <span class="text-xs font-mono text-[#FF4500] bg-[#FF4500]/10 px-2.5 py-1 rounded-md border border-[#FF4500]/20">Target Persona</span>
+          </div>
+
+          <div class="mb-4 flex items-baseline gap-2">
+            <span class="font-serif text-7xl lg:text-8xl text-zinc-50 tracking-tighter" data-price="29" data-yearly="23">$29</span>
+            <span class="text-zinc-500 font-mono text-sm">/ mo</span>
+          </div>
+          
+          <p class="text-zinc-400 mb-12 text-base">
+            For the profitable indie SaaS. Everything you need to find churn, nothing you don't.
+          </p>
+
+          <!-- Typography-based Feature List (No checkmarks) -->
+          <div class="mt-auto">
+            <div class="text-xs font-medium text-zinc-600 uppercase tracking-widest mb-6">What's included</div>
+            <ul class="flex flex-col font-mono text-sm">
+              <li class="flex justify-between items-center py-4 border-b border-zinc-800/60 group/row hover:bg-zinc-800/20 -mx-4 px-4 transition-colors duration-300">
+                <span class="text-zinc-400 font-sans">Event Volume</span>
+                <span class="text-zinc-100 group-hover/row:text-white transition-colors duration-300">500,000 /mo</span>
+              </li>
+              <li class="flex justify-between items-center py-4 border-b border-zinc-800/60 group/row hover:bg-zinc-800/20 -mx-4 px-4 transition-colors duration-300">
+                <span class="text-zinc-400 font-sans">Data Retention</span>
+                <span class="text-zinc-100 group-hover/row:text-white transition-colors duration-300">Forever</span>
+              </li>
+              <li class="flex justify-between items-center py-4 border-b border-zinc-800/60 group/row hover:bg-zinc-800/20 -mx-4 px-4 transition-colors duration-300">
+                <span class="text-zinc-400 font-sans">Custom Funnels</span>
+                <span class="text-zinc-100 group-hover/row:text-white transition-colors duration-300">Unlimited</span>
+              </li>
+              <li class="flex justify-between items-center py-4 group/row hover:bg-zinc-800/20 -mx-4 px-4 transition-colors duration-300">
+                <span class="text-zinc-400 font-sans">Export</span>
+                <span class="text-zinc-100 group-hover/row:text-white transition-colors duration-300">Raw SQL + API</span>
+              </li>
+            </ul>
+          </div>
+
+          <button class="w-full mt-12 bg-white text-zinc-950 font-medium py-4 px-6 rounded-xl hover:bg-zinc-200 hover:scale-[0.98] transition-all duration-300 ease-out-expo focus:outline-none focus:ring-2 focus:ring-[#FF4500] focus:ring-offset-2 focus:ring-offset-zinc-900">
+            Start Studio Trial
+          </button>
+        </div>
+      </div>
+
+      <!-- SIDE COLUMN: Stacked Solo & Custom (Spans 5 columns) -->
+      <div class="lg:col-span-5 flex flex-col gap-6">
+        
+        <!-- TIER: Solo -->
+        <div class="flex-1 flex flex-col bg-zinc-900/40 border border-zinc-800/80 rounded-[2rem] p-8 md:p-10 transition-colors duration-500 hover:border-zinc-700/80 hover:bg-zinc-900/60">
+          <h3 class="text-zinc-400 font-medium tracking-wide text-sm uppercase mb-6">Solo</h3>
+          
+          <div class="mb-2 flex items-baseline gap-2">
+            <span class="font-serif text-5xl text-zinc-200 tracking-tighter" data-price="9" data-yearly="7">$9</span>
+            <span class="text-zinc-600 font-mono text-xs">/ mo</span>
+          </div>
+          
+          <p class="text-zinc-500 text-sm mb-8">
+            For the weekend project that might actually launch.
+          </p>
+
+          <ul class="flex flex-col font-mono text-xs mt-auto space-y-1">
+            <li class="flex justify-between items-center py-2.5 border-b border-zinc-800/40">
+              <span class="text-zinc-500 font-sans">Event Volume</span>
+              <span class="text-zinc-300">50,000 /mo</span>
+            </li>
+            <li class="flex justify-between items-center py-2.5 border-b border-zinc-800/40">
+              <span class="text-zinc-500 font-sans">Data Retention</span>
+              <span class="text-zinc-300">90 days</span>
+            </li>
+            <li class="flex justify-between items-center py-2.5">
+              <span class="text-zinc-500 font-sans">Export</span>
+              <span class="text-zinc-300">CSV only</span>
+            </li>
+          </ul>
+
+          <button class="w-full mt-8 bg-transparent border border-zinc-700 text-zinc-300 font-medium py-3 px-6 rounded-xl hover:border-zinc-500 hover:text-white transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-zinc-600 focus:ring-offset-2 focus:ring-offset-zinc-950">
+            Get Solo
+          </button>
+        </div>
+
+        <!-- TIER: Custom -->
+        <div class="flex-1 flex flex-col bg-zinc-950 border border-zinc-800/80 rounded-[2rem] p-8 md:p-10 transition-colors duration-500 hover:border-zinc-700/80">
+          <h3 class="text-zinc-500 font-medium tracking-wide text-sm uppercase mb-6">Enterprise</h3>
+          
+          <div class="mb-2 flex items-baseline gap-2">
+            <span class="font-serif text-4xl text-zinc-300 tracking-tighter">Volume</span>
+          </div>
+          
+          <p class="text-zinc-500 text-sm mb-8">
+            When you outgrow the database. Dedicated clusters on fly.io.
+          </p>
+
+          <ul class="flex flex-col font-mono text-xs mt-auto space-y-1">
+            <li class="flex justify-between items-center py-2.5 border-b border-zinc-800/40">
+              <span class="text-zinc-500 font-sans">Infrastructure</span>
+              <span class="text-zinc-300">VPC Peering</span>
+            </li>
+            <li class="flex justify-between items-center py-2.5">
+              <span class="text-zinc-500 font-sans">Support</span>
+              <span class="text-zinc-300">Shared Slack</span>
+            </li>
+          </ul>
+
+          <button class="w-full mt-8 bg-zinc-800/50 text-zinc-300 font-medium py-3 px-6 rounded-xl hover:bg-zinc-800 hover:text-white transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-zinc-600 focus:ring-offset-2 focus:ring-offset-zinc-950">
+            Talk to us
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Honest Footer -->
+    <div class="mt-20 pt-8 border-t border-zinc-800/50 flex flex-col md:flex-row items-center justify-center gap-2 md:gap-6 text-xs font-mono text-zinc-500">
+      <span>Cancel anytime.</span>
+      <span class="hidden md:inline text-zinc-700">·</span>
+      <span>No credit card required for trial.</span>
+      <span class="hidden md:inline text-zinc-700">·</span>
+      <span>Real humans answer support.</span>
+    </div>
+
+  </div>
+</section>
+
+<script>
+  function setBilling(plan) {
+    const isYearly = plan === 'yearly';
+    
+    // UI Toggle State
+    const btnMonthly = document.getElementById('btn-monthly');
+    const btnYearly = document.getElementById('btn-yearly');
+    const pill = document.getElementById('toggle-pill');
+    
+    if (isYearly) {
+      btnMonthly.classList.replace('text-white', 'text-zinc-500');
+      btnYearly.classList.replace('text-zinc-500', 'text-white');
+      // Calculate transform based on button widths (approximate for this static build)
+      pill.style.transform = 'translateX(94px)';
+      pill.style.width = '124px';
+    } else {
+      btnMonthly.classList.replace('text-zinc-500', 'text-white');
+      btnYearly.classList.replace('text-white', 'text-zinc-500');
+      pill.style.transform = 'translateX(0px)';
+      pill.style.width = '90px';
+    }
+
+    // Update Prices with subtle animation
+    const priceElements = document.querySelectorAll('[data-price]');
+    priceElements.forEach(el => {
+      // Fade down
+      el.style.opacity = '0';
+      el.style.transform = 'translateY(4px)';
+      el.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
+      
+      setTimeout(() => {
+        // Update value
+        el.textContent = '$' + (isYearly ? el.dataset.yearly : el.dataset.price);
+        
+        // Fade up
+        el.style.opacity = '1';
+        el.style.transform = 'translateY(0px)';
+      }, 200);
+    });
+  }
+</script>
+          </div>
+          <div class="bg-zinc-950 border-t border-zinc-800 p-4">
+            <div class="max-w-[1800px] mx-auto flex items-center gap-6 text-xs font-mono text-zinc-400">
+              <div><span class="text-zinc-600">Component:</span> <span class="text-white">Pricing Section (Pro)</span></div>
+              <div><span class="text-zinc-600">Model:</span> <span class="font-bold" style="color: #10b981">Gemini 3.1 Pro Preview</span></div>
+              <div><span class="text-zinc-600">Duration:</span> <span class="text-white">60.3s</span></div>
+              <div><span class="text-zinc-600">Tokens:</span> <span class="text-white">8361</span></div>
+              <div><span class="text-zinc-600">Cost:</span> <span class="text-white">Paid · ~$0.05</span></div>
+            </div>
+          </div>
+        </div>
+      
+    </div>
+  
+    <div class="component-section " data-component-section="animated">
+      
+        <div class="panel active" id="animated-claude">
+          <div class="preview">
+            <section class="relative min-h-screen w-full overflow-hidden bg-[#05070d] text-white" style="font-family: 'Inter', sans-serif;">
+  <canvas id="aurora-canvas" class="absolute inset-0 h-full w-full"></canvas>
+
+  <div class="absolute inset-0 pointer-events-none" style="background: radial-gradient(ellipse 80% 60% at 85% 50%, transparent 0%, rgba(5,7,13,0.4) 40%, rgba(5,7,13,0.95) 80%), linear-gradient(90deg, rgba(5,7,13,0.92) 0%, rgba(5,7,13,0.7) 35%, transparent 60%);"></div>
+
+  <div class="absolute inset-0 pointer-events-none opacity-[0.06] mix-blend-overlay" style="background-image: url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22200%22><filter id=%22n%22><feTurbulence baseFrequency=%220.9%22/></filter><rect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23n)%22/></svg>');"></div>
+
+  <!-- Top nav strip -->
+  <header class="relative z-20 flex items-center justify-between px-8 md:px-14 pt-8">
+    <div class="flex items-center gap-2.5">
+      <div class="h-2 w-2 rounded-full bg-[#c6ff5a] shadow-[0_0_12px_#c6ff5a]"></div>
+      <span class="text-[11px] tracking-[0.2em] uppercase text-white/70" style="font-weight: 500;">Aurora</span>
+    </div>
+    <div class="hidden md:flex items-center gap-8 text-[12px] text-white/50 tracking-wide">
+      <a href="#" class="hover:text-white transition-colors">Lessons</a>
+      <a href="#" class="hover:text-white transition-colors">Gallery</a>
+      <a href="#" class="hover:text-white transition-colors">Manifesto</a>
+    </div>
+    <div class="text-[11px] tracking-[0.18em] uppercase text-white/40">Issue 01 · MMXXVI</div>
+  </header>
+
+  <!-- Main content -->
+  <div class="relative z-10 px-8 md:px-14 pt-[14vh] md:pt-[18vh] max-w-[1400px]">
+    <!-- Meta line -->
+    <div class="flex items-center gap-3 mb-10 fade-in" style="animation-delay: 0.1s;">
+      <div class="h-px w-10 bg-[#c6ff5a]/70"></div>
+      <span class="text-[10.5px] tracking-[0.28em] uppercase text-[#c6ff5a]/90" style="font-weight: 500;">A field guide to shaders</span>
+    </div>
+
+    <!-- Headline -->
+    <h1 class="max-w-[14ch] leading-[0.92] tracking-[-0.035em] text-white" style="font-family: 'Fraunces', serif; font-weight: 300; font-size: clamp(3rem, 7.4vw, 7.25rem); font-variation-settings: 'opsz' 144;">
+      <span class="block fade-up" style="animation-delay: 0.2s;">The pixel</span>
+      <span class="block fade-up italic" style="animation-delay: 0.35s; font-weight: 300;">is a <span style="font-weight: 800; font-style: normal; letter-spacing: -0.04em;">verb</span>,</span>
+      <span class="block fade-up text-white/55" style="animation-delay: 0.5s;">not a noun.</span>
+    </h1>
+
+    <!-- Body -->
+    <p class="mt-10 max-w-[38ch] text-[15px] leading-[1.65] text-white/60 fade-up" style="animation-delay: 0.7s;">
+      Aurora teaches designers to write light. Ninety minutes a week, a compiler, and the quiet thrill of bending a fragment shader until it sings back at you.
+    </p>
+
+    <!-- CTAs -->
+    <div class="mt-12 flex items-center gap-8 fade-up" style="animation-delay: 0.85s;">
+      <a href="#" class="group relative inline-flex items-center gap-3 rounded-full bg-[#c6ff5a] px-6 py-3.5 text-[13px] text-[#05070d] transition-transform duration-500 hover:-translate-y-[2px]" style="font-weight: 600; letter-spacing: -0.01em; transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1); box-shadow: 0 0 40px rgba(198, 255, 90, 0.25);">
+        Begin Lesson 01
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="transition-transform duration-500 group-hover:translate-x-0.5" style="transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);"><path d="M1 7h12M8 2l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+      <a href="#" class="group inline-flex items-center gap-2 text-[13px] text-white/60 hover:text-white transition-colors">
+        <span class="border-b border-white/20 group-hover:border-white/60 pb-0.5 transition-colors">Watch the intro film · 2 min</span>
+        <span aria-hidden="true" class="transition-transform duration-500 group-hover:translate-x-0.5" style="transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);">→</span>
+      </a>
+    </div>
+
+    <!-- What's inside badge -->
+    <div class="mt-16 inline-flex items-center gap-4 rounded-full border border-white/10 bg-white/[0.03] backdrop-blur-md px-5 py-2.5 fade-up" style="animation-delay: 1s;">
+      <span class="h-1.5 w-1.5 rounded-full bg-[#c6ff5a] animate-pulse"></span>
+      <span class="text-[11.5px] tracking-[0.08em] text-white/70">20 lessons</span>
+      <span class="text-white/20">·</span>
+      <span class="text-[11.5px] tracking-[0.08em] text-white/70">3 shader projects</span>
+      <span class="text-white/20">·</span>
+      <span class="text-[11.5px] tracking-[0.08em] text-white/70">GLSL primer</span>
+    </div>
+  </div>
+
+  <!-- Bottom right signature -->
+  <div class="absolute bottom-8 right-8 md:right-14 z-10 text-right fade-in" style="animation-delay: 1.2s;">
+    <div class="text-[10px] tracking-[0.25em] uppercase text-white/30 mb-1">Currently rendering</div>
+    <div class="text-[11px] tracking-wide text-white/60" style="font-family: 'Fraunces', serif; font-style: italic;">noise · displacement · wonder</div>
+  </div>
+
+  <!-- Left vertical ticker -->
+  <div class="hidden md:block absolute bottom-8 left-14 z-10 fade-in" style="animation-delay: 1.2s;">
+    <div class="text-[10px] tracking-[0.25em] uppercase text-white/30">Scroll · 01 / 07</div>
+  </div>
+
+  <style>
+    @keyframes fadeUp {
+      0% { opacity: 0; transform: translateY(18px); filter: blur(6px); }
+      100% { opacity: 1; transform: translateY(0); filter: blur(0); }
+    }
+    @keyframes fadeIn {
+      0% { opacity: 0; }
+      100% { opacity: 1; }
+    }
+    .fade-up { opacity: 0; animation: fadeUp 1.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+    .fade-in { opacity: 0; animation: fadeIn 1.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+  </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+  <script>
+    (function () {
+      const canvas = document.getElementById('aurora-canvas');
+      const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
+      camera.position.set(0, 0, 4.2);
+
+      // Custom shader with vertex displacement — this IS what Aurora teaches
+      const uniforms = {
+        uTime: { value: 0 },
+        uAccent: { value: new THREE.Color('#c6ff5a') },
+        uDeep:   { value: new THREE.Color('#0a1430') },
+      };
+
+      const vertexShader = `
+        uniform float uTime;
+        varying vec3 vNormal;
+        varying vec3 vPos;
+        varying float vDisp;
+
+        // classic 3D simplex-ish noise (cheap)
+        vec3 mod289(vec3 x){return x-floor(x*(1.0/289.0))*289.0;}
+        vec4 mod289(vec4 x){return x-floor(x*(1.0/289.0))*289.0;}
+        vec4 permute(vec4 x){return mod289(((x*34.0)+1.0)*x);}
+        vec4 taylorInvSqrt(vec4 r){return 1.79284291400159-0.85373472095314*r;}
+        float snoise(vec3 v){
+          const vec2 C=vec2(1.0/6.0,1.0/3.0);
+          const vec4 D=vec4(0.0,0.5,1.0,2.0);
+          vec3 i=floor(v+dot(v,C.yyy));
+          vec3 x0=v-i+dot(i,C.xxx);
+          vec3 g=step(x0.yzx,x0.xyz);
+          vec3 l=1.0-g;
+          vec3 i1=min(g.xyz,l.zxy);
+          vec3 i2=max(g.xyz,l.zxy);
+          vec3 x1=x0-i1+C.xxx;
+          vec3 x2=x0-i2+C.yyy;
+          vec3 x3=x0-D.yyy;
+          i=mod289(i);
+          vec4 p=permute(permute(permute(
+            i.z+vec4(0.0,i1.z,i2.z,1.0))
+            +i.y+vec4(0.0,i1.y,i2.y,1.0))
+            +i.x+vec4(0.0,i1.x,i2.x,1.0));
+          float n_=0.142857142857;
+          vec3 ns=n_*D.wyz-D.xzx;
+          vec4 j=p-49.0*floor(p*ns.z*ns.z);
+          vec4 x_=floor(j*ns.z);
+          vec4 y_=floor(j-7.0*x_);
+          vec4 x=x_*ns.x+ns.yyyy;
+          vec4 y=y_*ns.x+ns.yyyy;
+          vec4 h=1.0-abs(x)-abs(y);
+          vec4 b0=vec4(x.xy,y.xy);
+          vec4 b1=vec4(x.zw,y.zw);
+          vec4 s0=floor(b0)*2.0+1.0;
+          vec4 s1=floor(b1)*2.0+1.0;
+          vec4 sh=-step(h,vec4(0.0));
+          vec4 a0=b0.xzyw+s0.xzyw*sh.xxyy;
+          vec4 a1=b1.xzyw+s1.xzyw*sh.zzww;
+          vec3 p0=vec3(a0.xy,h.x);
+          vec3 p1=vec3(a0.zw,h.y);
+          vec3 p2=vec3(a1.xy,h.z);
+          vec3 p3=vec3(a1.zw,h.w);
+          vec4 norm=taylorInvSqrt(vec4(dot(p0,p0),dot(p1,p1),dot(p2,p2),dot(p3,p3)));
+          p0*=norm.x;p1*=norm.y;p2*=norm.z;p3*=norm.w;
+          vec4 m=max(0.6-vec4(dot(x0,x0),dot(x1,x1),dot(x2,x2),dot(x3,x3)),0.0);
+          m=m*m;
+          return 42.0*dot(m*m,vec4(dot(p0,x0),dot(p1,x1),dot(p2,x2),dot(p3,x3)));
+        }
+
+        void main() {
+          vNormal = normal;
+          float n = snoise(normal * 1.4 + vec3(uTime * 0.18));
+          float n2 = snoise(normal * 2.8 - vec3(uTime * 0.12));
+          float disp = n * 0.32 + n2 * 0.14;
+          vDisp = disp;
+          vec3 newPos = position + normal * disp;
+          vPos = newPos;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(newPos, 1.0);
+        }
+      `;
+
+      const fragmentShader = `
+        uniform vec3 uAccent;
+        uniform vec3 uDeep;
+        uniform float uTime;
+        varying vec3 vNormal;
+        varying vec3 vPos;
+        varying float vDisp;
+
+        void main() {
+          float fres = pow(1.0 - abs(dot(normalize(vNormal), vec3(0.0,0.0,1.0))), 2.2);
+          float rim = smoothstep(0.2, 1.0, fres);
+          vec3 col = mix(uDeep, uAccent, rim * (0.55 + vDisp * 1.6));
+          col += uAccent * pow(rim, 6.0) * 0.9;
+          // subtle inner glow pulse
+          col += vec3(0.02, 0.05, 0.12) * (0.5 + 0.5 * sin(uTime * 0.4));
+          gl_FragColor = vec4(col, rim * 0.95 + 0.05);
+        }
+      `;
+
+      const geometry = new THREE.IcosahedronGeometry(1.35, 64);
+      const material = new THREE.ShaderMaterial({
+        uniforms, vertexShader, fragmentShader,
+        transparent: true,
+        wireframe: false,
+      });
+      const mesh = new THREE.Mesh(geometry, material);
+      scene.add(mesh);
+
+      // Wireframe overlay for that "teaching" feel
+      const wireMat = new THREE.ShaderMaterial({
+        uniforms,
+        vertexShader,
+        fragmentShader: `
+          uniform vec3 uAccent;
+          varying float vDisp;
+          void main() {
+            gl_FragColor = vec4(uAccent, 0.18 + vDisp * 0.6);
+          }
+        `,
+        wireframe: true,
+        transparent: true,
+      });
+      const wire = new THREE.Mesh(geometry, wireMat);
+      scene.add(wire);
+
+      function resize() {
+        const w = canvas.clientWidth;
+        const h = canvas.clientHeight;
+        renderer.setSize(w, h, false);
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+        // Anchor mesh visually to the right
+        const xOffset = w > 900 ? 1.4 : 0;
+        mesh.position.x = xOffset;
+        wire.position.x = xOffset;
+      }
+      resize();
+      window.addEventListener('resize', resize);
+
+      const clock = new THREE.Clock();
+      function tick() {
+        const t = clock.getElapsedTime();
+        uniforms.uTime.value = t;
+        mesh.rotation.y = t * 0.08;
+        mesh.rotation.x = Math.sin(t * 0.12) * 0.15;
+        wire.rotation.copy(mesh.rotation);
+        renderer.render(scene, camera);
+        requestAnimationFrame(tick);
+      }
+      tick();
+    })();
+  </script>
+</section>
+          </div>
+          <div class="bg-zinc-950 border-t border-zinc-800 p-4">
+            <div class="max-w-[1800px] mx-auto flex items-center gap-6 text-xs font-mono text-zinc-400">
+              <div><span class="text-zinc-600">Component:</span> <span class="text-white">Animated Hero with Three.js</span></div>
+              <div><span class="text-zinc-600">Model:</span> <span class="font-bold" style="color: #f97316">Claude Opus 4.6</span></div>
+              <div><span class="text-zinc-600">Duration:</span> <span class="text-white">76.0s</span></div>
+              <div><span class="text-zinc-600">Tokens:</span> <span class="text-white">22627</span></div>
+              <div><span class="text-zinc-600">Cost:</span> <span class="text-white">Max sub · $0</span></div>
+            </div>
+          </div>
+        </div>
+      
+        <div class="panel " id="animated-gemini">
+          <div class="preview">
+            <style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;1,9..144,300;1,9..144,400&family=Inter:wght@300;400;700;900&display=swap');
+
+  :root {
+    --bg-color: #030305;
+    --accent: #00f0ff;
+  }
+
+  /* Custom Easings */
+  .ease-out-custom {
+    transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* Reveal Animations */
+  @keyframes revealUp {
+    0% {
+      opacity: 0;
+      transform: translateY(32px) scale(0.98);
+      filter: blur(4px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      filter: blur(0);
+    }
+  }
+
+  @keyframes drawLine {
+    0% { transform: scaleX(0); }
+    100% { transform: scaleX(1); }
+  }
+
+  .animate-reveal {
+    opacity: 0;
+    animation: revealUp 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .delay-100 { animation-delay: 0.1s; }
+  .delay-200 { animation-delay: 0.2s; }
+  .delay-300 { animation-delay: 0.3s; }
+  .delay-400 { animation-delay: 0.4s; }
+
+  /* SVG Noise Overlay */
+  .bg-noise {
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  }
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+
+<div class="relative min-h-screen bg-[#030305] text-[#ededed] overflow-hidden selection:bg-[#00f0ff] selection:text-black font-['Inter',sans-serif]">
+  
+  <!-- Texture overlay for editorial feel -->
+  <div class="pointer-events-none absolute inset-0 z-50 opacity-[0.04] mix-blend-screen bg-noise"></div>
+
+  <!-- Three.js Canvas Container -->
+  <div id="webgl-container" class="absolute inset-0 z-0"></div>
+
+  <!-- Radial gradient to ensure text readability against the mesh -->
+  <div class="absolute inset-0 z-[5] bg-[radial-gradient(ellipse_at_left_center,rgba(3,3,5,0.9)_0%,rgba(3,3,5,0)_60%)] md:bg-[radial-gradient(ellipse_at_left_center,rgba(3,3,5,0.8)_0%,rgba(3,3,5,0)_70%)] pointer-events-none"></div>
+
+  <!-- Main Content -->
+  <main class="relative z-10 w-full max-w-[1600px] mx-auto px-6 md:px-12 lg:px-24 min-h-screen flex items-center">
+    
+    <div class="w-full md:w-[80%] lg:w-[55%] flex flex-col items-start pt-24 pb-32">
+      
+      <!-- Micro-meta / Badge -->
+      <div class="animate-reveal flex items-center gap-4 mb-10 md:mb-16">
+        <div class="relative flex items-center justify-center w-3 h-3">
+          <span class="absolute inline-flex h-full w-full rounded-full bg-[#00f0ff] opacity-20 animate-ping"></span>
+          <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#00f0ff]"></span>
+        </div>
+        <p class="text-[10px] sm:text-xs tracking-[0.2em] uppercase font-mono text-[#00f0ff]/80">
+          20 Lessons &middot; 3 Shader Projects &middot; GLSL Primer
+        </p>
+      </div>
+
+      <!-- Headline -->
+      <h1 class="animate-reveal delay-100 text-[clamp(3.5rem,8vw,7.5rem)] leading-[0.95] tracking-[-0.04em] font-light text-white m-0 pb-2">
+        The medium <br />
+        is the <span class="font-['Fraunces',serif] font-light italic text-[#00f0ff] tracking-normal pr-4">syntax.</span>
+      </h1>
+
+      <!-- Divider line -->
+      <div class="w-12 h-[1px] bg-white/20 mt-10 mb-8 origin-left animate-reveal delay-200" style="animation-name: drawLine; animation-duration: 1.5s;"></div>
+
+      <!-- Subcopy -->
+      <p class="animate-reveal delay-300 text-[clamp(1.1rem,1.5vw,1.25rem)] leading-[1.6] text-neutral-400 max-w-[28ch] md:max-w-[42ch] font-light tracking-tight">
+        Aurora is a quiet space for designers to learn WebGL and custom shaders. No engineering dogma. Just mathematics, light, and motion working together.
+      </p>
+
+      <!-- Actions -->
+      <div class="animate-reveal delay-400 mt-14 flex flex-col sm:flex-row items-start sm:items-center gap-8 sm:gap-12">
+        <button class="group relative px-8 py-4 bg-white text-black text-[11px] sm:text-xs uppercase tracking-[0.15em] font-bold overflow-hidden transition-transform hover:-translate-y-0.5 ease-out-custom duration-300">
+          <span class="relative z-10 transition-colors duration-300 group-hover:text-black">Enter the Playground</span>
+          <div class="absolute inset-0 bg-[#00f0ff] transform scale-y-0 origin-bottom transition-transform duration-500 cubic-bezier(0.16, 1, 0.3, 1) group-hover:scale-y-100 z-0"></div>
+        </button>
+        
+        <a href="#syllabus" class="group flex items-center gap-3 text-sm font-medium text-neutral-500 hover:text-white transition-colors duration-300">
+          Read the syllabus
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" class="transform transition-transform duration-300 ease-out-custom group-hover:translate-x-1">
+            <path d="M8.16667 3.5L11.6667 7M11.6667 7L8.16667 10.5M11.6667 7L2.33333 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" stroke-linejoin="round"/>
+          </svg>
+        </a>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script>
+  // Three.js Setup
+  const container = document.getElementById('webgl-container');
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0x030305, 0.035);
+
+  const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+  
+  const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  container.appendChild(renderer.domElement);
+
+  // Geometric Mesh representing "Math as a material"
+  // High detail Icosahedron looks beautifully complex in wireframe
+  const geometry = new THREE.IcosahedronGeometry(4.5, 3);
+  
+  const material = new THREE.MeshBasicMaterial({
+    color: 0x00f0ff,
+    wireframe: true,
+    transparent: true,
+    opacity: 0.12,
+  });
+
+  const mesh = new THREE.Mesh(geometry, material);
+  scene.add(mesh);
+
+  // Floating background particles (dust motes)
+  const particlesGeo = new THREE.BufferGeometry();
+  const particlesCount = 800;
+  const posArray = new Float32Array(particlesCount * 3);
+
+  for(let i = 0; i < particlesCount * 3; i++) {
+    // Spread particles in a wide volume
+    posArray[i] = (Math.random() - 0.5) * 30;
+  }
+
+  particlesGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+  const particlesMaterial = new THREE.PointsMaterial({
+    size: 0.015,
+    color: 0x00f0ff,
+    transparent: true,
+    opacity: 0.3,
+    blending: THREE.AdditiveBlending
+  });
+
+  const particleMesh = new THREE.Points(particlesGeo, particlesMaterial);
+  scene.add(particleMesh);
+
+  // Responsive Positioning
+  function updateMeshPosition() {
+    if (window.innerWidth < 768) {
+      // Mobile: Push up and slightly right
+      mesh.position.set(1, 3, -8);
+      camera.position.z = 8;
+    } else {
+      // Desktop: Anchor visually to the right half
+      mesh.position.set(5, 0, -6);
+      camera.position.z = 6;
+    }
+  }
+  updateMeshPosition();
+
+  // Mouse Parallax
+  let mouseX = 0;
+  let mouseY = 0;
+  let targetX = 0;
+  let targetY = 0;
+
+  const windowHalfX = window.innerWidth / 2;
+  const windowHalfY = window.innerHeight / 2;
+
+  document.addEventListener('mousemove', (event) => {
+    mouseX = (event.clientX - windowHalfX) * 0.001;
+    mouseY = (event.clientY - windowHalfY) * 0.001;
+  });
+
+  // Animation Loop
+  const clock = new THREE.Clock();
+
+  function animate() {
+    requestAnimationFrame(animate);
+    const elapsedTime = clock.getElapsedTime();
+
+    // Subtle, organic rotation
+    mesh.rotation.y = elapsedTime * 0.03;
+    mesh.rotation.x = elapsedTime * 0.015;
+    mesh.rotation.z = Math.sin(elapsedTime * 0.1) * 0.1;
+
+    // Breathing effect (scale)
+    const scale = 1 + Math.sin(elapsedTime * 0.5) * 0.02;
+    mesh.scale.set(scale, scale, scale);
+
+    // Particle drift
+    particleMesh.rotation.y = elapsedTime * 0.01;
+    particleMesh.position.y = Math.sin(elapsedTime * 0.2) * 0.5;
+
+    // Smooth parallax interpolation
+    targetX = mouseX * 2;
+    targetY = mouseY * 2;
+    
+    camera.position.x += (targetX - camera.position.x) * 0.02;
+    camera.position.y += (-targetY - camera.position.y) * 0.02;
+    camera.lookAt(scene.position);
+
+    renderer.render(scene, camera);
+  }
+
+  animate();
+
+  // Handle Resize
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    updateMeshPosition();
+  });
+</script>
+          </div>
+          <div class="bg-zinc-950 border-t border-zinc-800 p-4">
+            <div class="max-w-[1800px] mx-auto flex items-center gap-6 text-xs font-mono text-zinc-400">
+              <div><span class="text-zinc-600">Component:</span> <span class="text-white">Animated Hero with Three.js</span></div>
+              <div><span class="text-zinc-600">Model:</span> <span class="font-bold" style="color: #10b981">Gemini 3.1 Pro Preview</span></div>
+              <div><span class="text-zinc-600">Duration:</span> <span class="text-white">55.6s</span></div>
+              <div><span class="text-zinc-600">Tokens:</span> <span class="text-white">8092</span></div>
+              <div><span class="text-zinc-600">Cost:</span> <span class="text-white">Paid · ~$0.05</span></div>
+            </div>
+          </div>
+        </div>
+      
+    </div>
+  
+
+  <!-- Brief modal -->
+  <div id="brief-modal" class="hidden fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6 overflow-auto" onclick="this.classList.add('hidden')">
+    <div class="bg-zinc-900 border border-zinc-800 rounded-2xl max-w-4xl w-full p-6 max-h-[90vh] overflow-auto" onclick="event.stopPropagation()">
+      <div class="flex items-center justify-between mb-4 sticky top-0 bg-zinc-900 pb-2">
+        <h3 class="font-bold text-white">📋 Prompts used</h3>
+        <button onclick="document.getElementById('brief-modal').classList.add('hidden')" class="text-zinc-500 hover:text-white">✕</button>
+      </div>
+      
+        <div class="mb-6">
+          <h4 class="text-sm font-bold text-white mb-2">💎 Pricing Section (Pro)</h4>
+          <pre class="text-[11px] text-zinc-400 whitespace-pre-wrap font-mono leading-relaxed bg-black/40 p-4 rounded">&lt;context>
+Product: "Pulse" — privacy-first analytics for indie SaaS founders
+Persona: Marc, 34, indie founder of a $20k MRR SaaS, technical, hates marketing fluff,
+         used Plausible before but wants more depth. Decides in 30 seconds if a tool is "for him".
+Section: Pricing section (placed mid-page, after features)
+&lt;/context>
+
+&lt;task>
+Build a pricing section that feels like a designer-founder wrote it, not a SaaS template.
+Reference vibes: linear.app/pricing, plausible.io/#pricing, rauno.me, fly.io/pricing.
+&lt;/task>
+
+&lt;constraints>
+- Exactly 3 tiers: "Solo" / "Studio" / "Custom"
+- ONE tier visually elevated (NOT centered - asymmetric emphasis instead)
+- Real opinionated copy ("For the 1-person SaaS that doesn't need 47 dashboards")
+- Real numbers ($9, $29, "Talk to us")
+- Show what's INCLUDED with concrete numbers (10k pageviews, 100k events, etc)
+- NO checkmark icons — use typography hierarchy instead
+- Toggle for monthly/yearly with 20% off yearly
+- A small "honest" footer: "Cancel anytime · No credit card required · Real humans answer support"
+- Background should feel intentional (subtle, maybe a faint grid or noise)
+- Palette: zinc + ONE accent (your choice, but justify it visually)
+&lt;/constraints>
+
+&lt;acceptance_criteria>
+□ Asymmetric, NOT 3-equal-columns
+□ Copy feels human and specific to the indie founder persona
+□ NO generic SaaS phrases
+□ Strong type hierarchy (huge price + tiny meta)
+□ The chosen tier is elevated through DESIGN, not a "Most Popular" badge
+□ Interactivity hint (hover state described in code)
+□ Looks like it could be on Linear's actual site
+&lt;/acceptance_criteria></pre>
+        </div>
+      
+        <div class="mb-6">
+          <h4 class="text-sm font-bold text-white mb-2">🎨 Animated Hero with Three.js</h4>
+          <pre class="text-[11px] text-zinc-400 whitespace-pre-wrap font-mono leading-relaxed bg-black/40 p-4 rounded">&lt;context>
+Product: "Aurora" — a creative coding playground for designers learning shaders
+Persona: Maya, 28, designer at a startup, curious about shaders/WebGL, intimidated by code.
+         Will spend 5 seconds deciding if Aurora is "for her".
+Section: Hero section that MUST showcase WebGL capability through the visual itself
+&lt;/context>
+
+&lt;task>
+Build a hero section with a REAL working three.js animation in the background.
+The animation IS the visual proof of what Aurora teaches.
+&lt;/task>
+
+&lt;constraints>
+- Use Three.js loaded from CDN: &lt;script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js">&lt;/script>
+- Animation: Choose ONE of these (your call, pick the most beautiful):
+  a) Floating mesh of particles forming an organic shape, slow rotation
+  b) Animated wireframe geometry (icosahedron/torus) with smooth color shifts
+  c) GLSL shader-like effect using a plane with custom vertex displacement
+- Animation must be SUBTLE and slow (no seizure-mode), feel premium
+- Hero text overlays on top of the canvas, must be readable
+- Asymmetric layout: text 50% left, canvas extends full width but is anchored visually right
+- Headline that's POETIC not generic ("The medium is the syntax" / something better)
+- 1 primary CTA, 1 quiet text link with arrow
+- Small "what's inside" badge: "20 lessons · 3 shader projects · GLSL primer"
+- The whole section feels like a magazine cover for a code zine
+- Palette: deep navy/almost-black + ONE phosphor accent (cyan / lime / amber)
+- Custom font weights, NO generic Tailwind text-2xl etc — use clamp() for fluid type
+&lt;/constraints>
+
+&lt;acceptance_criteria>
+□ Three.js code WORKS when rendered in browser (no errors)
+□ Animation is visible, smooth, premium-feeling
+□ Text is readable on top of the canvas
+□ Asymmetric layout with intentional negative space
+□ Copy is poetic and specific, not generic
+□ Looks like a real product page, not a tutorial demo
+□ Custom CSS animations on text (slow fade-in, character stagger if possible)
+&lt;/acceptance_criteria></pre>
+        </div>
+      
+    </div>
+  </div>
+
+  <script>
+    // Component tabs
+    document.querySelectorAll('.component-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-component');
+        document.querySelectorAll('.component-tab').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        document.querySelectorAll('.component-section').forEach(s => s.classList.remove('active'));
+        document.querySelector('[data-component-section="' + id + '"]').classList.add('active');
+        // Show right model tabs
+        document.querySelectorAll('.model-tabs').forEach(t => { t.classList.remove('flex'); t.classList.add('hidden'); });
+        const tabs = document.querySelector('[data-component-tabs="' + id + '"]');
+        tabs.classList.remove('hidden');
+        tabs.classList.add('flex');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+    });
+
+    // Model tabs
+    document.querySelectorAll('.model-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const target = btn.getAttribute('data-target');
+        const parent = btn.getAttribute('data-component-parent');
+        // Reset siblings within same component
+        document.querySelectorAll('[data-component-parent="' + parent + '"]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        // Hide all panels in this component, show target
+        document.querySelector('[data-component-section="' + parent + '"]').querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+        document.getElementById(target).classList.add('active');
+      });
+    });
+  </script>
+</body>
+</html>
