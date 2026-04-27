@@ -8,6 +8,12 @@ import { lazy, Suspense } from "react";
 const ShaderLabWrapper = lazy(() =>
   import("./features/shader-lab/ShaderLabWrapper").then((m) => ({ default: m.ShaderLabWrapper }))
 );
+const LibraryPage = lazy(() =>
+  import("./pages/LibraryPage").then((m) => ({ default: m.LibraryPage }))
+);
+const BuilderPage = lazy(() =>
+  import("./pages/BuilderPage").then((m) => ({ default: m.BuilderPage }))
+);
 
 function Loading() {
   return (
@@ -32,6 +38,8 @@ export default function App() {
               <Route path="/" element={<Home />} />
               <Route path="/extract" element={<ExtractPage />} />
               <Route path="/shader-lab" element={<ShaderLabWrapper />} />
+              <Route path="/library" element={<LibraryPage />} />
+              <Route path="/builder" element={<BuilderPage />} />
               <Route path="/medal-forge" element={<MedalForgePage />} />
             </Routes>
           </Suspense>
