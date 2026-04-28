@@ -96,44 +96,81 @@ module.exports = async function surgicalExtract(rootSelector, rootTreePath) {
     }
   }
 
-  // Also collect ancestor elements (for inherited styles like body, html, containers)
-  const ancestorEls = new Set();
-  let parent = rootEl.parentElement;
-  while (parent) {
-    ancestorEls.add(parent);
-    parent = parent.parentElement;
+  // ── Build class index for fast matching ─────────────────────────────
+  // Collect ALL class names used by section elements + ancestors.
+  // Then match CSS rules by checking if their selector references any
+  // of these classes. This catches Tailwind responsive variants like
+  // md\:grid-cols-3, hover\:bg-blue-500, etc. that element.matches() misses.
+  const usedClasses = new Set();
+  const usedIds = new Set();
+  const usedTags = new Set();
+
+  function collectIdentifiers(el) {
+    if (el.id) usedIds.add(el.id);
+    usedTags.add(el.tagName.toLowerCase());
+    if (typeof el.className === "string") {
+      el.className.trim().split(/\s+/).forEach(function(cls) {
+        if (cls) usedClasses.add(cls);
+      });
+    }
   }
 
-  // Test if a selector is relevant to our section:
-  // 1. Matches an element IN the section directly
-  // 2. Matches an ANCESTOR (inherited styles like body font, container width)
-  // 3. Is a universal/global rule (*, html, body, :root)
+  // Section elements
+  for (const el of sectionEls) collectIdentifiers(el);
+  // Ancestors (body, html, containers — for inherited styles)
+  let parent = rootEl.parentElement;
+  while (parent) {
+    collectIdentifiers(parent);
+    parent = parent.parentElement;
+  }
+  // Always include global tags
+  usedTags.add("html");
+  usedTags.add("body");
+  usedTags.add("*");
+
+  // Test if a selector references any class/id/tag we use
   function isRelevantSelector(selector) {
-    const selectors = selector.split(",").map(s => s.trim());
-    for (const sel of selectors) {
-      // Global rules always relevant
-      if (/^(\*|html|body|:root)(\s|$|,|{|\[|:)/.test(sel) || sel === "*") return true;
-      // Strip pseudo-classes/elements for matching
-      const base = sel
-        .replace(/::[\w-]+(\([^)]*\))?/g, "")
-        .replace(/:(?:hover|focus|active|focus-within|focus-visible|visited|checked|disabled|enabled|first-child|last-child|nth-child\([^)]*\)|nth-of-type\([^)]*\)|first-of-type|last-of-type|only-child|empty|not\([^)]*\)|where\([^)]*\)|is\([^)]*\)|has\([^)]*\))/g, "")
-        .trim();
-      if (!base) continue;
-      try {
-        // Check section elements
-        for (const el of sectionEls) {
-          if (el.matches(base)) return true;
-        }
-        // Check ancestors (for inherited styles)
-        for (const el of ancestorEls) {
-          if (el.matches(base)) return true;
-        }
-      } catch(e) {}
+    // Global rules always relevant
+    if (/^(\*|:root|html|body)([^a-zA-Z]|$)/.test(selector.trim())) return true;
+
+    // Check if any used class appears in the selector
+    // Tailwind classes contain : which becomes \: in CSS selectors
+    // e.g., class="md:grid-cols-3" → selector ".md\:grid-cols-3"
+    for (const cls of usedClasses) {
+      // Escape the class for regex (handle special chars)
+      var escaped = cls.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      // Also check with \: escape for Tailwind variants
+      var tailwindEscaped = escaped.replace(/:/g, "\\\\:");
+      if (selector.indexOf("." + cls) > -1) return true;
+      if (selector.indexOf("." + cls.replace(/:/g, "\\:")) > -1) return true;
     }
+
+    // Check IDs
+    for (const id of usedIds) {
+      if (selector.indexOf("#" + id) > -1) return true;
+    }
+
+    // Check tag selectors (only if simple tag selector, not inside a class)
+    var parts = selector.split(",");
+    for (var p = 0; p < parts.length; p++) {
+      var sel = parts[p].trim();
+      // Simple tag selector: "div", "section", "h1" etc.
+      var tagMatch = sel.match(/^([a-z][a-z0-9]*)/i);
+      if (tagMatch && usedTags.has(tagMatch[1].toLowerCase())) return true;
+      // Tag after combinator: "> h1", " p", "+ span"
+      var afterCombinator = sel.match(/[\s>+~]\s*([a-z][a-z0-9]*)/gi);
+      if (afterCombinator) {
+        for (var ac = 0; ac < afterCombinator.length; ac++) {
+          var t = afterCombinator[ac].trim().replace(/^[>+~\s]+/, "");
+          if (usedTags.has(t.toLowerCase())) return true;
+        }
+      }
+    }
+
     return false;
   }
 
-  // Process a style rule — only collect if relevant to our section + ancestors
+  // Process a style rule
   function processStyleRule(rule) {
     if (!isRelevantSelector(rule.selectorText)) return null;
     const css = serializeStyle(rule.style);
