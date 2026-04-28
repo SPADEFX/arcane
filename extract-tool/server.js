@@ -814,8 +814,12 @@ async function handleSaveToLibrary(req, res) {
   req.on("data", (c) => { body += c; if (body.length > 5e6) req.destroy(); });
   req.on("end", () => {
     try {
-      const { name, slug, tsx, css: rawCss, rawHtml: rawH, props, screenshot, description, sourceUrl } = JSON.parse(body);
+      let { name, slug, tsx, css: rawCss, rawHtml: rawH, props, screenshot, description, sourceUrl } = JSON.parse(body);
       if (!name || !slug) return sendJson(res, 400, { error: "missing name or slug" });
+
+      // Sanitize name to valid PascalCase JS identifier
+      name = name.replace(/[^a-zA-Z0-9]/g, " ").replace(/\b\w/g, c => c.toUpperCase()).replace(/\s+/g, "");
+      if (!/^[A-Z]/.test(name)) name = "X" + name;
 
       const studioRoot = path.join(__dirname, "..");
       const componentsDir = path.join(studioRoot, "ui-library", "components");
