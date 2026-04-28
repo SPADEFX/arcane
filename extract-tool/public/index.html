@@ -2507,6 +2507,7 @@ ${treeText.slice(0, 15000)}`;
           props: window.__lastExtractProps || [],
           screenshot: screenshotImg.src || "",
           description: "Extracted from " + (window.__capturedUrl || "unknown site"),
+          sourceUrl: window.__capturedUrl || "",
         }),
       })
         .then(r => r.json())

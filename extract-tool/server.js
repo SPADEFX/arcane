@@ -814,12 +814,26 @@ async function handleSaveToLibrary(req, res) {
   req.on("data", (c) => { body += c; if (body.length > 5e6) req.destroy(); });
   req.on("end", () => {
     try {
-      const { name, slug, tsx, css, rawHtml, props, screenshot, description } = JSON.parse(body);
+      const { name, slug, tsx, css: rawCss, rawHtml: rawH, props, screenshot, description, sourceUrl } = JSON.parse(body);
       if (!name || !slug) return sendJson(res, 400, { error: "missing name or slug" });
 
       const studioRoot = path.join(__dirname, "..");
       const componentsDir = path.join(studioRoot, "ui-library", "components");
       const storiesDir = path.join(studioRoot, "ui-library", "stories");
+
+      // Fix CSS for Shadow DOM: :root → :host
+      let css = (rawCss || "").replace(/:root\b/g, ":host");
+
+      // Fix relative URLs in HTML — make absolute using source URL
+      let rawHtml = rawH || "";
+      if (sourceUrl) {
+        try {
+          const base = new URL(sourceUrl).origin;
+          rawHtml = rawHtml.replace(/src="\/([^"]+)"/g, `src="${base}/$1"`);
+          rawHtml = rawHtml.replace(/href="\/([^"]+)"/g, `href="${base}/$1"`);
+          css = css.replace(/url\(["']?\/([^"')]+)["']?\)/g, `url("${base}/$1")`);
+        } catch(e) {}
+      }
 
       // 1. Write the component file
       const compFile = path.join(componentsDir, `extracted-${slug}.tsx`);
