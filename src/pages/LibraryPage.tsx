@@ -6,6 +6,7 @@ import type { ComponentCategory, ComponentDefinition } from "@/types/component-r
 
 const CATEGORIES: { value: ComponentCategory | "all"; label: string }[] = [
   { value: "all", label: "Tous" },
+  { value: "extracted", label: "Extracted" },
   { value: "hero", label: "Hero" },
   { value: "navigation", label: "Navigation" },
   { value: "interactive", label: "Interactive" },
@@ -28,12 +29,20 @@ export function LibraryPage() {
 
   useEffect(() => {
     bootstrapRegistry().then(() => load());
+    // Refresh when a new component is added from Extract Tool
+    const handler = (e: MessageEvent) => {
+      if (e.data?.type === "arcane-save-component") {
+        setTimeout(() => load(), 500);
+      }
+    };
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
   }, []);
 
   const components = filtered();
 
   return (
-    <div className="h-screen overflow-y-auto bg-zinc-950 p-8">
+    <div className="h-full overflow-y-auto bg-zinc-950 p-8">
       <div className="max-w-6xl mx-auto">
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-zinc-100 mb-1">Component Library</h1>

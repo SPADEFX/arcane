@@ -47,6 +47,8 @@ export default function App() {
         try {
           await db.put("components", e.data.component);
           console.log("✅ Component saved to library:", e.data.component.name);
+          // Reload extracted blocks in builder registry
+          import("./features/builder-registry/blocks").then(m => m.loadExtractedBlocks());
         } catch (err) {
           console.error("Failed to save component:", err);
         }
@@ -66,7 +68,8 @@ export default function App() {
               <Route path="/" element={<Home />} />
               <Route path="/extract" element={<iframe src="http://localhost:3000" style={{ width: "100%", height: "100%", border: "none" }} title="Extract Tool" />} />
               <Route path="/shader-lab" element={<ShaderLabWrapper />} />
-              <Route path="/library" element={<StorybookPage />} />
+              <Route path="/library" element={<LibraryPage />} />
+              <Route path="/storybook" element={<StorybookPage />} />
               <Route path="/my-components" element={<MyComponentsPage />} />
               <Route path="/builder" element={<BuilderDashboard />} />
               <Route path="/site/:siteId" element={<BuilderEditor />} />
