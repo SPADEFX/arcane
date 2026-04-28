@@ -2508,17 +2508,19 @@ ${treeText.slice(0, 15000)}`;
         noScreenshot.style.display = "block";
       }
 
-      // TSX code
-      tsxArea.value = data.tsx || data.component || "";
+      // TSX code — response has { component: { tsx, css, props }, extraction: { scopedCss, stats } }
+      const comp = data.component || {};
+      const ext = data.extraction || {};
+      tsxArea.value = comp.tsx || "";
 
       // Scoped CSS
-      cssArea.value = data.scopedCss || data.css || "";
+      cssArea.value = ext.scopedCss || comp.css || "";
 
       // Props
-      const props = data.props || [];
+      const props = comp.props || [];
       if (props.length) {
         propsList.innerHTML = props.map(p =>
-          `<li><span class="prop-name">${p.name || p}</span><span class="prop-type">${p.type || "string"}</span></li>`
+          `<li><span class="prop-name">${p.name}</span><span class="prop-type">${p.tsType || p.type || "string"}</span><span style="color:var(--muted);margin-left:8px;font-size:10px">${p.defaultValue ? '= "' + String(p.defaultValue).slice(0, 30) + '"' : ""}</span></li>`
         ).join("");
       } else {
         propsList.innerHTML = '<li style="color:var(--muted);font-style:italic">No props detected</li>';
@@ -2528,14 +2530,14 @@ ${treeText.slice(0, 15000)}`;
       nameInput.value = data.name || "ExtractedSection";
 
       // Stats
+      const st = ext.stats || {};
       const stats = [];
-      if (data.stats) {
-        if (data.stats.elements) stats.push(data.stats.elements + " elements");
-        if (data.stats.cssRules) stats.push(data.stats.cssRules + " CSS rules");
-        if (data.stats.cssVars) stats.push(data.stats.cssVars + " CSS vars");
-        if (data.stats.images) stats.push(data.stats.images + " images");
-        if (data.stats.fonts) stats.push(data.stats.fonts + " fonts");
-      }
+      if (st.elements) stats.push(st.elements + " elements");
+      if (st.cssRules) stats.push(st.cssRules + " CSS rules");
+      if (st.cssVarCount) stats.push(st.cssVarCount + " CSS vars");
+      if (st.imageCount) stats.push(st.imageCount + " images");
+      if (st.fontCount) stats.push(st.fontCount + " fonts");
+      if (st.animationCount) stats.push(st.animationCount + " animations");
       statsDiv.textContent = stats.length ? stats.join(" · ") : "";
 
       overlay.classList.add("show");
