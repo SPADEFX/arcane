@@ -2494,15 +2494,32 @@ ${treeText.slice(0, 15000)}`;
         updatedAt: Date.now(),
       };
 
-      // Send to parent (Studio on :3333) via postMessage — IndexedDB is origin-scoped
-      // so we can't write to Studio's DB from this iframe on :3000
-      try {
-        window.parent.postMessage({ type: "arcane-save-component", component }, "*");
-        overlay.classList.remove("show");
-        showToast("✅ " + name + " sent to Library!");
-      } catch(e) {
-        showToast("Error: " + e.message);
-      }
+      // 1. Save files to disk (component + story for Storybook)
+      fetch("/api/save-to-library", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name: name,
+          slug: slug,
+          tsx: tsxArea.value,
+          css: cssArea.value,
+          rawHtml: window.__lastExtractHtml || "",
+          props: window.__lastExtractProps || [],
+          screenshot: screenshotImg.src || "",
+          description: "Extracted from " + (window.__capturedUrl || "unknown site"),
+        }),
+      })
+        .then(r => r.json())
+        .then(json => {
+          if (!json.ok) throw new Error(json.error);
+          // 2. Also notify Studio parent for IndexedDB + Builder
+          try { window.parent.postMessage({ type: "arcane-save-component", component }, "*"); } catch(e) {}
+          overlay.classList.remove("show");
+          showToast("✅ " + name + " added to Library + Storybook!");
+        })
+        .catch(err => {
+          showToast("Error: " + err.message);
+        });
     });
 
     // Expose function to open modal with data

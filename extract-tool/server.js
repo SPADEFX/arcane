@@ -808,6 +808,79 @@ function handleCloneFiles(req, res) {
   });
 }
 
+// Save extracted component as Storybook story + component files
+async function handleSaveToLibrary(req, res) {
+  let body = "";
+  req.on("data", (c) => { body += c; if (body.length > 5e6) req.destroy(); });
+  req.on("end", () => {
+    try {
+      const { name, slug, tsx, css, rawHtml, props, screenshot, description } = JSON.parse(body);
+      if (!name || !slug) return sendJson(res, 400, { error: "missing name or slug" });
+
+      const studioRoot = path.join(__dirname, "..");
+      const componentsDir = path.join(studioRoot, "ui-library", "components");
+      const storiesDir = path.join(studioRoot, "ui-library", "stories");
+
+      // 1. Write the component file
+      const compFile = path.join(componentsDir, `extracted-${slug}.tsx`);
+      fs.writeFileSync(compFile, tsx || `// Extracted: ${name}\nexport function ${name}() { return null; }`);
+
+      // 2. Write the CSS file (if any)
+      if (css && css.trim()) {
+        fs.writeFileSync(path.join(componentsDir, `extracted-${slug}.css`), css);
+      }
+
+      // 3. Generate and write the Storybook story
+      const storyContent = `import type { Meta, StoryObj } from "@storybook/react";
+
+// Extracted component — rendered via raw HTML + scoped CSS in Shadow DOM
+function ${name}Preview() {
+  return (
+    <div
+      ref={(el) => {
+        if (!el) return;
+        let shadow = el.shadowRoot;
+        if (!shadow) shadow = el.attachShadow({ mode: "open" });
+        shadow.innerHTML = \`<style>${(css || "").replace(/`/g, "\\`")}</style>${(rawHtml || tsx || "").replace(/`/g, "\\`")}\`;
+      }}
+      style={{ width: "100%" }}
+    />
+  );
+}
+
+const meta = {
+  title: "Extracted/${name}",
+  component: ${name}Preview,
+  parameters: { layout: "fullscreen" },
+} satisfies Meta<typeof ${name}Preview>;
+
+export default meta;
+type Story = StoryObj<typeof meta>;
+
+export const Default: Story = {};
+`;
+      fs.writeFileSync(path.join(storiesDir, `extracted-${slug}.stories.tsx`), storyContent);
+
+      // 4. Save screenshot as thumbnail
+      if (screenshot && screenshot.startsWith("data:image")) {
+        const b64 = screenshot.replace(/^data:image\/\w+;base64,/, "");
+        fs.writeFileSync(path.join(componentsDir, `extracted-${slug}.png`), Buffer.from(b64, "base64"));
+      }
+
+      sendJson(res, 200, {
+        ok: true,
+        files: {
+          component: `ui-library/components/extracted-${slug}.tsx`,
+          css: css ? `ui-library/components/extracted-${slug}.css` : null,
+          story: `ui-library/stories/extracted-${slug}.stories.tsx`,
+        },
+      });
+    } catch (e) {
+      sendJson(res, 500, { error: String(e.message || e) });
+    }
+  });
+}
+
 const server = http.createServer((req, res) => {
   if (req.method === "POST" && req.url === "/api/extract") return handleExtract(req, res);
   if (req.method === "POST" && req.url === "/api/record") return handleRecord(req, res);
@@ -820,6 +893,7 @@ const server = http.createServer((req, res) => {
   if (req.method === "POST" && req.url === "/api/clone-section") return handleCloneSection(req, res);
   if (req.method === "POST" && req.url === "/api/surgical-extract") return handleSurgicalExtract(req, res);
   if (req.method === "POST" && req.url === "/api/extract-to-component") return handleExtractToComponent(req, res);
+  if (req.method === "POST" && req.url === "/api/save-to-library") return handleSaveToLibrary(req, res);
   if (req.method === "GET" && req.url === "/api/progress") return handleProgress(req, res);
   if (req.method === "GET" && req.url.startsWith("/api/clone-files")) return handleCloneFiles(req, res);
   if (req.method === "GET") return serveStatic(req, res);
