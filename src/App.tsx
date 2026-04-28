@@ -10,8 +10,8 @@ import * as db from "./lib/db";
 const ShaderLabWrapper = lazy(() =>
   import("./features/shader-lab/ShaderLabWrapper").then((m) => ({ default: m.ShaderLabWrapper }))
 );
-const MyComponentsPage = lazy(() =>
-  import("./pages/MyComponentsPage").then((m) => ({ default: m.MyComponentsPage }))
+const LibraryPage = lazy(() =>
+  import("./pages/LibraryPage").then((m) => ({ default: m.LibraryPage }))
 );
 const BuilderDashboard = lazy(() =>
   import("./features/builder-routes/dashboard").then((m) => ({ default: m.Dashboard }))
@@ -70,7 +70,6 @@ export default function App() {
               <Route path="/shader-lab" element={<ShaderLabWrapper />} />
               <Route path="/library" element={<LibraryPage />} />
               <Route path="/storybook" element={<StorybookPage />} />
-              <Route path="/my-components" element={<MyComponentsPage />} />
               <Route path="/builder" element={<BuilderDashboard />} />
               <Route path="/site/:siteId" element={<BuilderEditor />} />
               <Route path="/preview/:siteId" element={<BuilderPreview />} />

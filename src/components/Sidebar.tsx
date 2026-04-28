@@ -29,10 +29,6 @@ export function Sidebar() {
           <span className="nav-icon">{icons.library}</span>
           <span className="nav-label">Library</span>
         </NavLink>
-        <NavLink to="/my-components" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
-          <span className="nav-icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 2h8l2 3H2l2-3z"/><rect x="2" y="5" width="12" height="9" rx="1"/></svg></span>
-          <span className="nav-label">My Components</span>
-        </NavLink>
         <NavLink to="/builder" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
           <span className="nav-icon">{icons.builder}</span>
           <span className="nav-label">Builder</span>
