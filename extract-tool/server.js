@@ -848,11 +848,37 @@ async function handleSaveToLibrary(req, res) {
         fs.writeFileSync(path.join(componentsDir, `extracted-${slug}.css`), css);
       }
 
-      // 3. Generate and write the Storybook story
+      // 3. Extract @import URLs for font loading
+      const importUrls = [];
+      (css || "").replace(/@import\s+url\(["']?([^"')]+)["']?\)/g, (_, url) => { importUrls.push(url); return _; });
+
+      // 4. Generate and write the Storybook story
+      const linkTags = importUrls.map((u, i) => `
+        if (!document.getElementById("ext-font-${slug}-${`\${i}`}")) {
+          var l = document.createElement("link");
+          l.id = "ext-font-${slug}-${`\${i}`}";
+          l.rel = "stylesheet";
+          l.href = "${u.replace(/"/g, '\\"')}";
+          document.head.appendChild(l);
+        }`).join("");
+
       const storyContent = `import type { Meta, StoryObj } from "@storybook/react";
+import { useEffect } from "react";
 
 // Extracted component — rendered via raw HTML + scoped CSS in Shadow DOM
 function ${name}Preview() {
+  useEffect(() => {
+    // Inject external stylesheets into main document for font loading
+    ${importUrls.map((u, i) => `
+    if (!document.getElementById("ext-font-${slug}-${i}")) {
+      var l = document.createElement("link");
+      l.id = "ext-font-${slug}-${i}";
+      l.rel = "stylesheet";
+      l.href = "${u.replace(/"/g, '\\"')}";
+      document.head.appendChild(l);
+    }`).join("")}
+  }, []);
+
   return (
     <div
       ref={(el) => {
