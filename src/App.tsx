@@ -4,7 +4,8 @@ import { Home } from "./pages/Home";
 import { ExtractPage } from "./pages/ExtractPage";
 import "./styles/global.css";
 
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
+import * as db from "./lib/db";
 
 const ShaderLabWrapper = lazy(() =>
   import("./features/shader-lab/ShaderLabWrapper").then((m) => ({ default: m.ShaderLabWrapper }))
@@ -39,6 +40,22 @@ function StorybookPage() {
 }
 
 export default function App() {
+  // Listen for components saved from Extract Tool iframe
+  useEffect(() => {
+    const handler = async (e: MessageEvent) => {
+      if (e.data?.type === "arcane-save-component" && e.data.component) {
+        try {
+          await db.put("components", e.data.component);
+          console.log("✅ Component saved to library:", e.data.component.name);
+        } catch (err) {
+          console.error("Failed to save component:", err);
+        }
+      }
+    };
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, []);
+
   return (
     <BrowserRouter>
       <div className="studio-layout">

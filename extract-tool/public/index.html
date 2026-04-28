@@ -2494,34 +2494,15 @@ ${treeText.slice(0, 15000)}`;
         updatedAt: Date.now(),
       };
 
-      // Save to IndexedDB "arcane" database, "components" store
-      const req = indexedDB.open("arcane", 1);
-      req.onupgradeneeded = () => {
-        const db = req.result;
-        if (!db.objectStoreNames.contains("components")) {
-          const store = db.createObjectStore("components", { keyPath: "id" });
-          store.createIndex("category", "category", { unique: false });
-          store.createIndex("slug", "slug", { unique: true });
-        }
-        if (!db.objectStoreNames.contains("projects")) db.createObjectStore("projects", { keyPath: "id" });
-        if (!db.objectStoreNames.contains("captures")) {
-          const store = db.createObjectStore("captures", { keyPath: "id" });
-          store.createIndex("status", "status", { unique: false });
-        }
-      };
-      req.onsuccess = () => {
-        const db = req.result;
-        const tx = db.transaction("components", "readwrite");
-        tx.objectStore("components").put(component);
-        tx.oncomplete = () => {
-          overlay.classList.remove("show");
-          showToast("✅ " + name + " added to Library!");
-          // Notify Studio if in iframe
-          try { window.parent.postMessage({ type: "arcane-component-added", component }, "*"); } catch(e) {}
-        };
-        tx.onerror = () => showToast("Error saving to library");
-      };
-      req.onerror = () => showToast("Error opening database");
+      // Send to parent (Studio on :3333) via postMessage — IndexedDB is origin-scoped
+      // so we can't write to Studio's DB from this iframe on :3000
+      try {
+        window.parent.postMessage({ type: "arcane-save-component", component }, "*");
+        overlay.classList.remove("show");
+        showToast("✅ " + name + " sent to Library!");
+      } catch(e) {
+        showToast("Error: " + e.message);
+      }
     });
 
     // Expose function to open modal with data
