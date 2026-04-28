@@ -13,6 +13,7 @@ const categoryOrder: { key: BlockCategory; label: string }[] = [
   { key: "hero", label: "Heroes" },
   { key: "section", label: "Sections" },
   { key: "footer", label: "Footers" },
+  { key: "extracted", label: "Extracted" },
 ];
 
 interface SidebarProps {

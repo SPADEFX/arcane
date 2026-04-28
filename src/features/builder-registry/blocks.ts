@@ -708,3 +708,46 @@ export const blockDefinitions: BlockDefinition[] = [
 ];
 
 export const blockMap = new Map(blockDefinitions.map((b) => [b.type, b]));
+
+// ── Load extracted components from IndexedDB into the registry ──────
+import { createExtractedBlock } from "../builder-components/extracted-block";
+
+export async function loadExtractedBlocks(): Promise<number> {
+  return new Promise((resolve) => {
+    const req = indexedDB.open("arcane", 1);
+    req.onerror = () => resolve(0);
+    req.onsuccess = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains("components")) { resolve(0); return; }
+      const tx = db.transaction("components", "readonly");
+      const store = tx.objectStore("components");
+      const getAll = store.getAll();
+      getAll.onsuccess = () => {
+        const components = getAll.result || [];
+        let added = 0;
+        for (const comp of components) {
+          if (!comp.code || !comp.css) continue;
+          const type = "extracted_" + comp.slug;
+          if (blockMap.has(type)) continue;
+          const def: BlockDefinition = {
+            type,
+            label: comp.name || comp.slug,
+            category: "extracted" as BlockCategory,
+            component: createExtractedBlock(comp.code, comp.css, comp.rawHtml),
+            defaultProps: comp.defaultProps || {},
+            propSchema: (comp.props || []).map((p: any) => ({
+              key: p.name,
+              label: p.label || p.name,
+              type: p.type === "image" ? "image" : p.type === "href" ? "text" : "text",
+            })),
+          };
+          blockDefinitions.push(def);
+          blockMap.set(type, def);
+          added++;
+        }
+        resolve(added);
+      };
+      getAll.onerror = () => resolve(0);
+    };
+  });
+}

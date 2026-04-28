@@ -13,7 +13,7 @@ import {
 import { nanoid } from "nanoid";
 import { useSiteStore } from "../builder-stores/site-store";
 import { useBuilderUIStore } from "../builder-stores/ui-store";
-import { blockMap } from "../builder-registry/blocks";
+import { blockMap, loadExtractedBlocks } from "../builder-registry/blocks";
 import { TopBar } from "../builder-components/top-bar";
 import { Sidebar } from "../builder-components/sidebar";
 import { Canvas } from "../builder-components/canvas";
@@ -27,9 +27,10 @@ export function Builder() {
   const { addBlock, moveBlock } = useSiteStore();
   const [draggedType, setDraggedType] = useState<string | null>(null);
 
-  // Set page title
+  // Load extracted components from IndexedDB + set title
   useEffect(() => {
     document.title = "Builder";
+    loadExtractedBlocks();
   }, []);
 
   // Initialize active page

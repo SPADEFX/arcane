@@ -2483,6 +2483,7 @@ ${treeText.slice(0, 15000)}`;
         source: { type: "extracted", captureId: "" },
         code: tsxArea.value,
         css: cssArea.value,
+        rawHtml: window.__lastExtractHtml || "",
         props: window.__lastExtractProps || [],
         defaultProps: {},
         thumbnail: screenshotImg.src || "",
@@ -2546,6 +2547,7 @@ ${treeText.slice(0, 15000)}`;
       // Props
       const props = comp.props || [];
       window.__lastExtractProps = props;
+      window.__lastExtractHtml = ext.html || "";
       if (props.length) {
         propsList.innerHTML = props.map(p =>
           `<li><span class="prop-name">${p.name}</span><span class="prop-type">${p.tsType || p.type || "string"}</span><span style="color:var(--muted);margin-left:8px;font-size:10px">${p.defaultValue ? '= "' + String(p.defaultValue).slice(0, 30) + '"' : ""}</span></li>`

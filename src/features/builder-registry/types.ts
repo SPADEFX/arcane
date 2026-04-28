@@ -51,7 +51,7 @@ export interface PropField {
   defaultValue?: unknown;
 }
 
-export type BlockCategory = "header" | "hero" | "section" | "footer";
+export type BlockCategory = "header" | "hero" | "section" | "footer" | "extracted";
 
 export interface BlockDefinition {
   type: string;
