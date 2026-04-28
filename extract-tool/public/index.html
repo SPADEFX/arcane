@@ -312,6 +312,7 @@
     <div class="sep"></div>
     <button id="ctxExtract">Extraire cette section seule</button>
     <button id="ctxClone">🧬 Cloner cette section (HTML+CSS+JS)</button>
+    <button id="ctxExtractLib">📦 Extract to Library</button>
   </div>
 
   <!-- Side panel: sections collector -->
@@ -1961,6 +1962,34 @@ ${treeText.slice(0, 15000)}`;
         showToast("Erreur: " + err.message);
       }
     });
+
+    // Extract to Library handler
+    document.getElementById("ctxExtractLib").addEventListener("click", async () => {
+      if (!ctxData) return;
+      const url = window.__capturedUrl || window.__proxyUrl;
+      if (!url) { showToast("No source URL available"); return; }
+      showToast("Extraction chirurgicale...");
+      try {
+        const resp = await fetch("/api/extract-to-component", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            url,
+            selector: ctxData.selector,
+            nthPath: ctxData.nthPath,
+            path: ctxData.path,
+            name: "ExtractedSection"
+          }),
+        });
+        const json = await resp.json();
+        if (!json.ok) throw new Error(json.error || "Server error");
+        window.__openLibModal(json);
+        showToast("Extraction complete!");
+      } catch(err) {
+        showToast("Error: " + err.message);
+      }
+    });
+
     // Listen for clone result
     window.addEventListener("message", (e) => {
       if (!e.data || e.data.type !== "mx-clone-result") return;
@@ -2284,6 +2313,234 @@ ${treeText.slice(0, 15000)}`;
       }
       c.innerHTML = h;
     }
+  </script>
+
+  <!-- Extract to Library Modal -->
+  <style>
+    .lib-modal-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+      z-index: 600; align-items: center; justify-content: center;
+    }
+    .lib-modal-overlay.show { display: flex; }
+    .lib-modal {
+      background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+      width: 95vw; max-width: 900px; max-height: 85vh; overflow: auto;
+      box-shadow: 0 16px 64px rgba(0,0,0,0.7); display: flex; flex-direction: column;
+    }
+    .lib-modal-header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 16px 20px; border-bottom: 1px solid var(--border);
+    }
+    .lib-modal-header h3 { font-size: 15px; font-weight: 700; }
+    .lib-modal-header button {
+      background: none; border: none; color: var(--muted); font-size: 20px; cursor: pointer;
+    }
+    .lib-modal-body { display: flex; flex: 1; overflow: hidden; min-height: 0; }
+    .lib-modal-left {
+      flex: 0 0 320px; border-right: 1px solid var(--border); padding: 16px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      overflow: auto; background: var(--bg);
+    }
+    .lib-modal-left img {
+      max-width: 100%; max-height: 300px; border-radius: 8px;
+      border: 1px solid var(--border); object-fit: contain;
+    }
+    .lib-modal-left .no-screenshot {
+      color: var(--muted); font-size: 12px; font-style: italic;
+    }
+    .lib-modal-right { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+    .lib-modal-tabs {
+      display: flex; border-bottom: 1px solid var(--border); padding: 0 16px;
+    }
+    .lib-modal-tabs button {
+      background: none; border: none; border-bottom: 2px solid transparent;
+      color: var(--muted); padding: 10px 14px; font-size: 12px; cursor: pointer;
+      font-weight: 500; transition: color 0.15s;
+    }
+    .lib-modal-tabs button:hover { color: var(--fg); }
+    .lib-modal-tabs button.active { color: var(--fg); border-bottom-color: var(--accent); }
+    .lib-modal-tabpanel { display: none; flex: 1; overflow: auto; padding: 12px 16px; }
+    .lib-modal-tabpanel.active { display: block; }
+    .lib-modal-tabpanel textarea {
+      width: 100%; min-height: 220px; background: var(--bg); color: var(--fg);
+      border: 1px solid var(--border); border-radius: 8px; padding: 12px;
+      font-family: "Fira Code", "Cascadia Code", monospace; font-size: 11px;
+      resize: vertical; line-height: 1.5; outline: none;
+    }
+    .lib-modal-tabpanel textarea:focus { border-color: var(--accent); }
+    .lib-modal-props-list {
+      list-style: none; font-size: 12px; color: var(--fg);
+    }
+    .lib-modal-props-list li {
+      padding: 6px 8px; border-bottom: 1px solid var(--border);
+      display: flex; justify-content: space-between;
+    }
+    .lib-modal-props-list li .prop-name { font-weight: 600; color: var(--accent); }
+    .lib-modal-props-list li .prop-type { color: var(--muted); font-size: 11px; }
+    .lib-modal-footer {
+      display: flex; align-items: center; gap: 10px; padding: 12px 20px;
+      border-top: 1px solid var(--border); flex-wrap: wrap;
+    }
+    .lib-modal-footer input[type="text"] {
+      flex: 1; min-width: 160px; background: var(--bg); border: 1px solid var(--border);
+      color: var(--fg); padding: 8px 12px; border-radius: 8px; font-size: 13px; outline: none;
+    }
+    .lib-modal-footer input[type="text"]:focus { border-color: var(--accent); }
+    .lib-modal-footer button {
+      background: var(--card); border: 1px solid var(--border); color: var(--fg);
+      padding: 8px 14px; border-radius: 8px; font-size: 12px; cursor: pointer;
+      font-weight: 500; transition: border-color 0.15s;
+    }
+    .lib-modal-footer button:hover { border-color: var(--accent); }
+    .lib-modal-footer button.primary {
+      background: var(--accent); color: #0b0c0f; border-color: var(--accent); font-weight: 600;
+    }
+    .lib-modal-stats {
+      width: 100%; font-size: 11px; color: var(--muted); margin-top: 6px;
+    }
+    @media (max-width: 700px) {
+      .lib-modal-body { flex-direction: column; }
+      .lib-modal-left { flex: 0 0 auto; border-right: none; border-bottom: 1px solid var(--border); max-height: 200px; }
+    }
+  </style>
+
+  <div class="lib-modal-overlay" id="libModalOverlay">
+    <div class="lib-modal">
+      <div class="lib-modal-header">
+        <h3>📦 Extract to Library</h3>
+        <button id="libModalClose">&times;</button>
+      </div>
+      <div class="lib-modal-body">
+        <div class="lib-modal-left">
+          <img id="libModalScreenshot" src="" alt="Screenshot" style="display:none" />
+          <div class="no-screenshot" id="libModalNoScreenshot">No screenshot available</div>
+        </div>
+        <div class="lib-modal-right">
+          <div class="lib-modal-tabs">
+            <button class="active" data-libtab="tsx">TSX</button>
+            <button data-libtab="css">CSS</button>
+            <button data-libtab="props">Props</button>
+          </div>
+          <div class="lib-modal-tabpanel active" data-libtab="tsx">
+            <textarea id="libModalTsx" spellcheck="false" placeholder="Generated TSX code..."></textarea>
+          </div>
+          <div class="lib-modal-tabpanel" data-libtab="css">
+            <textarea id="libModalCss" spellcheck="false" placeholder="Scoped CSS..."></textarea>
+          </div>
+          <div class="lib-modal-tabpanel" data-libtab="props">
+            <ul class="lib-modal-props-list" id="libModalPropsList">
+              <li style="color:var(--muted);font-style:italic">No props detected</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="lib-modal-footer">
+        <input type="text" id="libModalName" placeholder="Component name..." value="ExtractedSection" />
+        <button id="libModalCopyTsx">Copy TSX</button>
+        <button id="libModalCopyCss">Copy CSS</button>
+        <button id="libModalDownload" class="primary">Download</button>
+        <div class="lib-modal-stats" id="libModalStats"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  (function() {
+    const overlay = document.getElementById("libModalOverlay");
+    const closeBtn = document.getElementById("libModalClose");
+    const screenshotImg = document.getElementById("libModalScreenshot");
+    const noScreenshot = document.getElementById("libModalNoScreenshot");
+    const tsxArea = document.getElementById("libModalTsx");
+    const cssArea = document.getElementById("libModalCss");
+    const propsList = document.getElementById("libModalPropsList");
+    const nameInput = document.getElementById("libModalName");
+    const statsDiv = document.getElementById("libModalStats");
+
+    // Tab switching
+    document.querySelectorAll(".lib-modal-tabs button").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".lib-modal-tabs button").forEach(b => b.classList.remove("active"));
+        document.querySelectorAll(".lib-modal-tabpanel").forEach(p => p.classList.remove("active"));
+        btn.classList.add("active");
+        document.querySelector(`.lib-modal-tabpanel[data-libtab="${btn.dataset.libtab}"]`).classList.add("active");
+      });
+    });
+
+    // Close modal
+    closeBtn.addEventListener("click", () => overlay.classList.remove("show"));
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) overlay.classList.remove("show");
+    });
+
+    // Copy TSX
+    document.getElementById("libModalCopyTsx").addEventListener("click", () => {
+      navigator.clipboard.writeText(tsxArea.value).then(() => showToast("TSX copied!"));
+    });
+
+    // Copy CSS
+    document.getElementById("libModalCopyCss").addEventListener("click", () => {
+      navigator.clipboard.writeText(cssArea.value).then(() => showToast("CSS copied!"));
+    });
+
+    // Download
+    document.getElementById("libModalDownload").addEventListener("click", () => {
+      const name = nameInput.value || "ExtractedSection";
+      const zip = `// ${name}.tsx\n${tsxArea.value}\n\n/* ${name}.module.css */\n${cssArea.value}`;
+      const blob = new Blob([zip], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = name + ".tsx";
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast("Downloaded " + name + ".tsx");
+    });
+
+    // Expose function to open modal with data
+    window.__openLibModal = function(data) {
+      // Screenshot
+      if (data.screenshot) {
+        screenshotImg.src = data.screenshot;
+        screenshotImg.style.display = "block";
+        noScreenshot.style.display = "none";
+      } else {
+        screenshotImg.style.display = "none";
+        noScreenshot.style.display = "block";
+      }
+
+      // TSX code
+      tsxArea.value = data.tsx || data.component || "";
+
+      // Scoped CSS
+      cssArea.value = data.scopedCss || data.css || "";
+
+      // Props
+      const props = data.props || [];
+      if (props.length) {
+        propsList.innerHTML = props.map(p =>
+          `<li><span class="prop-name">${p.name || p}</span><span class="prop-type">${p.type || "string"}</span></li>`
+        ).join("");
+      } else {
+        propsList.innerHTML = '<li style="color:var(--muted);font-style:italic">No props detected</li>';
+      }
+
+      // Name
+      nameInput.value = data.name || "ExtractedSection";
+
+      // Stats
+      const stats = [];
+      if (data.stats) {
+        if (data.stats.elements) stats.push(data.stats.elements + " elements");
+        if (data.stats.cssRules) stats.push(data.stats.cssRules + " CSS rules");
+        if (data.stats.cssVars) stats.push(data.stats.cssVars + " CSS vars");
+        if (data.stats.images) stats.push(data.stats.images + " images");
+        if (data.stats.fonts) stats.push(data.stats.fonts + " fonts");
+      }
+      statsDiv.textContent = stats.length ? stats.join(" · ") : "";
+
+      overlay.classList.add("show");
+    };
+  })();
   </script>
 </body>
 </html>
