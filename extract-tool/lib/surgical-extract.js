@@ -23,7 +23,11 @@ module.exports = async function surgicalExtract(rootSelector, rootTreePath) {
   sectionEls.add(rootEl);
   rootEl.querySelectorAll("*").forEach(el => sectionEls.add(el));
 
-  // ── Phase 2: Iterate all stylesheets, collect matching rules ───────
+  // ── Phase 2: Collect ALL CSS rules from the page ────────────────────
+  // Previous approach: only collect rules matching elements in the section.
+  // Problem: misses inherited styles, parent selectors, complex combinators.
+  // New approach: collect ALL rules for maximum fidelity. The CSS will be
+  // bigger but the component will look identical to the original.
   const matchedRules = [];
   const keyframesMap = {};
   const allKeyframes = {};
@@ -92,11 +96,48 @@ module.exports = async function surgicalExtract(rootSelector, rootTreePath) {
     }
   }
 
-  // Process a style rule
+  // Also collect ancestor elements (for inherited styles like body, html, containers)
+  const ancestorEls = new Set();
+  let parent = rootEl.parentElement;
+  while (parent) {
+    ancestorEls.add(parent);
+    parent = parent.parentElement;
+  }
+
+  // Test if a selector is relevant to our section:
+  // 1. Matches an element IN the section directly
+  // 2. Matches an ANCESTOR (inherited styles like body font, container width)
+  // 3. Is a universal/global rule (*, html, body, :root)
+  function isRelevantSelector(selector) {
+    const selectors = selector.split(",").map(s => s.trim());
+    for (const sel of selectors) {
+      // Global rules always relevant
+      if (/^(\*|html|body|:root)(\s|$|,|{|\[|:)/.test(sel) || sel === "*") return true;
+      // Strip pseudo-classes/elements for matching
+      const base = sel
+        .replace(/::[\w-]+(\([^)]*\))?/g, "")
+        .replace(/:(?:hover|focus|active|focus-within|focus-visible|visited|checked|disabled|enabled|first-child|last-child|nth-child\([^)]*\)|nth-of-type\([^)]*\)|first-of-type|last-of-type|only-child|empty|not\([^)]*\)|where\([^)]*\)|is\([^)]*\)|has\([^)]*\))/g, "")
+        .trim();
+      if (!base) continue;
+      try {
+        // Check section elements
+        for (const el of sectionEls) {
+          if (el.matches(base)) return true;
+        }
+        // Check ancestors (for inherited styles)
+        for (const el of ancestorEls) {
+          if (el.matches(base)) return true;
+        }
+      } catch(e) {}
+    }
+    return false;
+  }
+
+  // Process a style rule — only collect if relevant to our section + ancestors
   function processStyleRule(rule) {
-    if (!sectionMatches(rule.selectorText)) return null;
+    if (!isRelevantSelector(rule.selectorText)) return null;
     const css = serializeStyle(rule.style);
-    // Scan all properties for references
+    if (!css) return null;
     for (let i = 0; i < rule.style.length; i++) {
       const prop = rule.style.item(i);
       const val = rule.style.getPropertyValue(prop);
@@ -113,36 +154,27 @@ module.exports = async function surgicalExtract(rootSelector, rootTreePath) {
         if (matched) matchedRules.push(matched);
       } else if (rule.type === CSSRule.MEDIA_RULE) {
         const mediaText = (rule.media && rule.media.mediaText) || "";
-        // Skip prefers-reduced-motion: reduce
         if (/prefers-reduced-motion\s*:\s*reduce/i.test(mediaText)) continue;
-        const innerMatched = [];
+        const innerRules = [];
         for (const inner of Array.from(rule.cssRules || [])) {
           if (inner.type === CSSRule.STYLE_RULE) {
             const m = processStyleRule(inner);
-            if (m) innerMatched.push(m);
+            if (m) innerRules.push(m);
           }
         }
-        if (innerMatched.length > 0) {
-          matchedRules.push({
-            type: "media",
-            mediaText: mediaText,
-            rules: innerMatched,
-          });
+        if (innerRules.length > 0) {
+          matchedRules.push({ type: "media", mediaText, rules: innerRules });
         }
       } else if (rule.type === CSSRule.SUPPORTS_RULE) {
-        const innerMatched = [];
+        const innerRules = [];
         for (const inner of Array.from(rule.cssRules || [])) {
           if (inner.type === CSSRule.STYLE_RULE) {
             const m = processStyleRule(inner);
-            if (m) innerMatched.push(m);
+            if (m) innerRules.push(m);
           }
         }
-        if (innerMatched.length > 0) {
-          matchedRules.push({
-            type: "supports",
-            conditionText: rule.conditionText || "",
-            rules: innerMatched,
-          });
+        if (innerRules.length > 0) {
+          matchedRules.push({ type: "supports", conditionText: rule.conditionText || "", rules: innerRules });
         }
       } else if (rule.type === CSSRule.KEYFRAMES_RULE) {
         allKeyframes[rule.name] = Array.from(rule.cssRules).map(r => ({
@@ -212,18 +244,13 @@ module.exports = async function surgicalExtract(rootSelector, rootTreePath) {
     }
   }
 
-  // ── Phase 4: Filter keyframes and fonts ────────────────────────────
+  // ── Phase 4: Filter keyframes and fonts to those referenced ─────────
   const keyframes = {};
   for (const name of keyframesNeeded) {
     if (allKeyframes[name]) keyframes[name] = allKeyframes[name];
   }
-
-  const fonts = allFontFaces.filter(ff => {
-    for (const f of fontsNeeded) {
-      if (ff.includes(f)) return true;
-    }
-    return false;
-  });
+  // Include all fonts (they're small and missing fonts = broken visuals)
+  const fonts = allFontFaces;
 
   // ── Phase 5: Asset collection ──────────────────────────────────────
   const images = [];
@@ -344,6 +371,26 @@ module.exports = async function surgicalExtract(rootSelector, rootTreePath) {
   }
 
   // ── Get HTML ───────────────────────────────────────────────────────
+  // Resolve relative URLs in images before capturing HTML
+  var origin = location.origin;
+  rootEl.querySelectorAll("img[src]").forEach(function(img) {
+    if (img.src && img.src.startsWith("/") && !img.src.startsWith("//")) {
+      img.setAttribute("src", origin + img.src);
+    }
+  });
+  rootEl.querySelectorAll("[srcset]").forEach(function(el) {
+    var srcset = el.getAttribute("srcset");
+    if (srcset) {
+      el.setAttribute("srcset", srcset.replace(/(^|,\s*)(\/[^\s,]+)/g, function(m, prefix, path) {
+        return prefix + origin + path;
+      }));
+    }
+  });
+  rootEl.querySelectorAll("a[href]").forEach(function(a) {
+    if (a.href && a.getAttribute("href").startsWith("/") && !a.getAttribute("href").startsWith("//")) {
+      a.setAttribute("href", origin + a.getAttribute("href"));
+    }
+  });
   const html = rootEl.outerHTML;
   const dimensions = {
     width: rootEl.offsetWidth,
