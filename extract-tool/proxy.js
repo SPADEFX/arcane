@@ -7,7 +7,19 @@
 
 const http = require("http");
 const https = require("https");
+const crypto = require("crypto");
 const { URL } = require("url");
+
+// Same lenient TLS agent used in extract.js — allows TLS 1.0/1.1,
+// weak ciphers, and servers that send alert 80 (internal_error).
+const LENIENT_HTTPS_AGENT = new https.Agent({
+  rejectUnauthorized: false,
+  secureOptions:
+    crypto.constants.SSL_OP_LEGACY_SERVER_CONNECT |
+    crypto.constants.SSL_OP_ALLOW_UNSAFE_LEGACY_RENEGOTIATION,
+  ciphers: "DEFAULT:@SECLEVEL=0",
+  minVersion: "TLSv1",
+});
 
 const target = process.argv[2];
 if (!target) {
@@ -177,8 +189,11 @@ const INSPECT_SCRIPT = `<script>
         // Visibility check
         var r = node.getBoundingClientRect();
         var cs = getComputedStyle(node);
-        var hidden = (r.width === 0 && r.height === 0 && node.children.length === 0) ||
-          cs.display === "none";
+        var hidden = (r.width === 0 && r.height === 0) ||
+          cs.display === "none" ||
+          cs.visibility === "hidden" ||
+          cs.opacity === "0" ||
+          (r.bottom < 0 || r.right < 0 || r.top > window.innerHeight + 500 || r.left > window.innerWidth + 500);
         // Analyze content to detect semantic role
         var text = (node.textContent || "").trim().slice(0, 80).replace(/\s+/g, " ");
         var innerTags = {};
@@ -317,12 +332,11 @@ function proxyRequest(req, res) {
   headers["origin"] = targetUrl.origin;
   headers["referer"] = targetUrl.href;
 
-  const mod = dest.protocol === "https:" ? https : http;
-  const proxyReq = mod.request(dest.href, {
-    method: req.method,
-    headers,
-    rejectUnauthorized: false,
-  }, (proxyRes) => {
+  function makeProxyRequest(destUrl, retryHttp) {
+  const mod = destUrl.protocol === "https:" ? https : http;
+  const reqOpts = { method: req.method, headers };
+  if (destUrl.protocol === "https:") reqOpts.agent = LENIENT_HTTPS_AGENT;
+  const proxyReq = mod.request(destUrl.href, reqOpts, (proxyRes) => {
     const resHeaders = {};
     for (const [k, v] of Object.entries(proxyRes.headers)) {
       if (!STRIP_RES.has(k.toLowerCase())) resHeaders[k] = v;
@@ -401,10 +415,21 @@ function proxyRequest(req, res) {
     }
   });
   proxyReq.on("error", (e) => {
+    // SSL protocol error on HTTPS → retry over plain HTTP
+    if (retryHttp && (e.code === "EPROTO" || e.code === "ERR_SSL_PROTOCOL_ERROR" || (e.message && e.message.includes("ssl"))) && destUrl.protocol === "https:") {
+      const httpDest = new URL(destUrl.href);
+      httpDest.protocol = "http:";
+      if (targetUrl.protocol === "https:") targetUrl = new URL("http://" + targetUrl.host);
+      makeProxyRequest(httpDest, false);
+      return;
+    }
     res.writeHead(502);
     res.end(`Proxy error: ${e.message}`);
   });
   req.pipe(proxyReq);
+  } // end makeProxyRequest
+
+  makeProxyRequest(dest, true);
 }
 
 const server = http.createServer(proxyRequest);

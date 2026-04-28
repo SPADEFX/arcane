@@ -1,6 +1,55 @@
 const puppeteer = require("puppeteer");
+const https = require("https");
+const http = require("http");
+const crypto = require("crypto");
 const pageCapture = require("./capture");
 const HOOKS = require("./hooks");
+
+// Most permissive TLS agent — disables all OpenSSL security checks so we
+// can reach servers with TLS 1.0/1.1, bad certs, weak ciphers, or that
+// send "internal error" alerts during strict handshakes.
+const LENIENT_HTTPS_AGENT = new https.Agent({
+  rejectUnauthorized: false,
+  secureOptions:
+    crypto.constants.SSL_OP_LEGACY_SERVER_CONNECT |
+    crypto.constants.SSL_OP_ALLOW_UNSAFE_LEGACY_RENEGOTIATION,
+  ciphers: "DEFAULT:@SECLEVEL=0",
+  minVersion: "TLSv1",
+});
+
+// Raw Node.js fetch used as last resort when Puppeteer's Chromium can't
+// connect (bad TLS version, port-80-with-TLS, TLS alert internal error…).
+function rawNodeFetch(url, maxRedirects = 6) {
+  return new Promise((resolve, reject) => {
+    if (maxRedirects <= 0) { reject(new Error("Too many redirects")); return; }
+    const isHttps = url.startsWith("https");
+    const mod = isHttps ? https : http;
+    const reqOpts = {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "identity",
+      },
+    };
+    if (isHttps) reqOpts.agent = LENIENT_HTTPS_AGENT;
+
+    const req = mod.get(url, reqOpts, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        const redirectUrl = new URL(res.headers.location, url).href;
+        res.resume();
+        resolve(rawNodeFetch(redirectUrl, maxRedirects - 1));
+        return;
+      }
+      const chunks = [];
+      res.on("data", c => chunks.push(c));
+      res.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+      res.on("error", reject);
+    });
+    req.on("error", reject);
+    req.setTimeout(20000, () => { req.destroy(); reject(new Error("raw fetch timeout")); });
+  });
+}
 
 async function launch() {
   return puppeteer.launch({
@@ -10,8 +59,89 @@ async function launch() {
     args: [
       "--disable-web-security",
       "--disable-features=IsolateOrigins,site-per-process",
+      "--ignore-certificate-errors",
+      "--ignore-certificate-errors-spki-list",
+      "--allow-insecure-localhost",
     ],
+    ignoreHTTPSErrors: true,
   });
+}
+
+const SSL_ERRORS = [
+  "ERR_SSL_PROTOCOL_ERROR",
+  "ERR_SSL_VERSION_OR_CIPHER_MISMATCH",
+  "ERR_CERT_AUTHORITY_INVALID",
+  "ERR_CERT_COMMON_NAME_INVALID",
+  "ERR_CERT_DATE_INVALID",
+  "ERR_SSL_HANDSHAKE_NOT_COMPLETED",
+  "ERR_CONNECTION_CLOSED",
+  "ERR_EMPTY_RESPONSE",
+];
+
+function isSslError(err) {
+  const msg = (err && err.message) || "";
+  return SSL_ERRORS.some(e => msg.includes(e));
+}
+
+// Fetch latest Wayback Machine snapshot URL for a given URL.
+async function waybackUrl(url) {
+  const apiUrl = `https://archive.org/wayback/available?url=${encodeURIComponent(url)}`;
+  return new Promise((resolve) => {
+    https.get(apiUrl, { headers: { "User-Agent": "Mozilla/5.0" } }, (res) => {
+      const chunks = [];
+      res.on("data", c => chunks.push(c));
+      res.on("end", () => {
+        try {
+          const json = JSON.parse(Buffer.concat(chunks).toString());
+          const snapshotUrl = json && json.archived_snapshots && json.archived_snapshots.closest && json.archived_snapshots.closest.url;
+          resolve(snapshotUrl || null);
+        } catch { resolve(null); }
+      });
+      res.on("error", () => resolve(null));
+    }).on("error", () => resolve(null));
+  });
+}
+
+// Four-tier navigation fallback for SSL-broken sites:
+//   1. Normal HTTPS via Puppeteer
+//   2. HTTP fallback via Puppeteer
+//   3. Raw Node.js fetch (SSL fully disabled) → page.setContent
+//   4. Wayback Machine latest snapshot → Puppeteer navigation
+async function gotoWithFallback(page, url, gotoOpts) {
+  // Tier 1: normal navigation
+  try {
+    return await page.goto(url, gotoOpts);
+  } catch (err) {
+    if (!isSslError(err)) throw err;
+  }
+
+  // Tier 2: HTTP fallback
+  if (url.startsWith("https://")) {
+    const httpUrl = "http://" + url.slice("https://".length);
+    try {
+      return await page.goto(httpUrl, gotoOpts);
+    } catch (err) {
+      if (!isSslError(err)) throw err;
+    }
+  }
+
+  // Tier 3: raw Node fetch with SSL fully disabled → inject HTML
+  try {
+    const rawHtml = await rawNodeFetch(url);
+    if (rawHtml && rawHtml.trim().length > 200) {
+      const base = url.replace(/\?.*$/, "").replace(/\/[^/]*$/, "/");
+      const injected = rawHtml.replace(/(<head[^>]*>)/i, `$1\n<base href="${base}">`);
+      return await page.setContent(injected, { waitUntil: "domcontentloaded", timeout: gotoOpts.timeout || 30000 });
+    }
+  } catch {}
+
+  // Tier 4: Wayback Machine snapshot
+  const archiveUrl = await waybackUrl(url);
+  if (archiveUrl) {
+    return await page.goto(archiveUrl, { ...gotoOpts, waitUntil: "domcontentloaded" });
+  }
+
+  throw new Error(`Site inaccessible — SSL cassé côté serveur (TLS alert 80). Aucune archive Wayback Machine disponible. Essaie un autre site.`);
 }
 
 async function extractWith(browser, url, opts = {}) {
@@ -33,11 +163,44 @@ async function extractWith(browser, url, opts = {}) {
     // Install recorder hooks BEFORE the page's JS runs — intercepts every
     // .animate() call and every style/class mutation with precise timestamps.
     await page.evaluateOnNewDocument(HOOKS);
-    await page.goto(url, { waitUntil: ["domcontentloaded", "networkidle2"], timeout: opts.timeoutMs || 120000 });
+    await gotoWithFallback(page, url, { waitUntil: ["domcontentloaded", "networkidle2"], timeout: opts.timeoutMs || 120000 });
     // Thorough mode: wait longer for async JS (hydration, font swap, lazy
     // anims) to settle before we start timing-sensitive analysis.
     const waitMs = opts.waitMs ?? (opts.thorough ? 3000 : 1500);
     await new Promise((r) => setTimeout(r, waitMs));
+
+    // ── CAPTCHA / challenge detection ───────────────────────────────────
+    // Detect common bot challenges. We can't solve them, but we can warn
+    // the user clearly instead of capturing a blank/challenge page.
+    const challengeInfo = await page.evaluate(() => {
+      const html = document.documentElement.innerHTML || "";
+      const title = document.title || "";
+      if (
+        document.querySelector("[data-sitekey]") ||
+        document.querySelector(".g-recaptcha, .h-captcha, #cf-challenge-running, #challenge-form, .cf-im-under-attack") ||
+        /cf-chl-widget|cf_clearance|jschl_vc|jschl_answer/.test(html) ||
+        /verifying you are human|checking your browser|ddos-guard|just a moment/i.test(title) ||
+        /just a moment/i.test(html.slice(0, 2000))
+      ) {
+        return {
+          detected: true,
+          type: document.querySelector("[data-sitekey]")
+            ? (document.querySelector(".h-captcha") ? "hCaptcha" : "reCAPTCHA")
+            : /cf-chl|cf_clearance|jschl/.test(html) || /just a moment/i.test(title)
+              ? "Cloudflare"
+              : "CAPTCHA/challenge",
+          title,
+        };
+      }
+      return { detected: false };
+    }).catch(() => ({ detected: false }));
+
+    if (challengeInfo.detected) {
+      throw new Error(
+        `${challengeInfo.type} détecté — le site bloque les navigateurs automatisés. ` +
+        `Utilise le proxy Live Preview pour accéder au site manuellement.`
+      );
+    }
 
     // ── Full Clone mode ─────────────────────────────────────────────────
     // Grab the full page HTML with <base href> pointing to the original
@@ -194,7 +357,7 @@ async function recordFrames(browser, url, opts = {}) {
         return orig.call(this, type, attrs);
       };
     });
-    await page.goto(url, { waitUntil: ["domcontentloaded", "networkidle2"], timeout: opts.timeoutMs || 120000 });
+    await gotoWithFallback(page, url, { waitUntil: ["domcontentloaded", "networkidle2"], timeout: opts.timeoutMs || 120000 });
     await new Promise((r) => setTimeout(r, 2000));
     // Capture each <canvas> element's frames via toDataURL inside the page.
     const result = await page.evaluate(async (opts) => {
@@ -275,4 +438,4 @@ async function extractPasses(browser, url, opts = {}) {
   return runs;
 }
 
-module.exports = { launch, extractWith, extractOne, extractPasses, recordFrames, buildRecordingHtml };
+module.exports = { launch, extractWith, extractOne, extractPasses, recordFrames, buildRecordingHtml, gotoWithFallback };

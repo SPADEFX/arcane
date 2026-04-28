@@ -1,10 +1,10 @@
 // Code Generation — transforms surgical extraction output into a clean React component.
-// HTML → JSX, CSS → scoped styles, WAAPI → Framer Motion, props detection.
+// HTML → JSX, CSS → scoped styles, WAAPI → Framer Motion variants, props detection.
 
 /**
  * @param {object} extraction — output from surgical-extract.js
  * @param {string} name — component name (PascalCase)
- * @returns {{ tsx: string, css: string, props: object[] }}
+ * @returns {{ tsx: string, css: string, props: object[], defaultProps: object }}
  */
 function generateComponent(extraction, name = "ExtractedSection") {
   const { html, scopedCss, wapiAnimations, transitions, cssVars, images } = extraction;
@@ -13,7 +13,7 @@ function generateComponent(extraction, name = "ExtractedSection") {
   let jsx = htmlToJsx(html);
 
   // ── Detect props from content ──────────────────────────────────────
-  const props = detectProps(jsx);
+  const props = detectProps(jsx, images);
 
   // ── Replace hardcoded content with prop references ─────────────────
   let propsInterface = "";
@@ -21,16 +21,12 @@ function generateComponent(extraction, name = "ExtractedSection") {
   let defaultPropsObj = {};
 
   if (props.length > 0) {
-    // Build interface
     propsInterface = props.map(p => `  /** ${p.label} */\n  ${p.name}?: ${p.tsType};`).join("\n");
     propsDestructure = props.map(p => p.name).join(", ");
-    defaultPropsObj = {};
     props.forEach(p => { defaultPropsObj[p.name] = p.defaultValue; });
 
-    // Replace content in JSX with prop references
     for (const p of props) {
       if (p.type === "text" && p.defaultValue) {
-        // Replace first occurrence of the default value with {propName}
         const escaped = escapeForRegex(p.defaultValue);
         jsx = jsx.replace(new RegExp(`>${escaped}<`), `>{${p.name}}<`);
       }
@@ -44,25 +40,43 @@ function generateComponent(extraction, name = "ExtractedSection") {
   }
 
   // ── WAAPI → Framer Motion ──────────────────────────────────────────
+  const hasAnimations = wapiAnimations && wapiAnimations.length > 0;
   let motionImport = "";
-  let motionCode = "";
-  if (wapiAnimations && wapiAnimations.length > 0) {
-    motionImport = 'import { motion } from "motion/react";';
-    motionCode = wapiAnimationsToFramer(wapiAnimations);
+  let motionVariants = "";
+  let wrapperTag = "div";
+  let wrapperAnimProps = "";
+
+  if (hasAnimations) {
+    motionImport = 'import { motion, useReducedMotion as useFramerReducedMotion } from "motion/react";';
+    motionVariants = wapiAnimationsToFramer(wapiAnimations);
+    wrapperTag = "motion.div";
+    // Apply the first animation variant to the wrapper
+    wrapperAnimProps = `\n        initial="initial"\n        animate="animate"\n        variants={anim0}`;
   }
 
-  // ── Build CSS module ───────────────────────────────────────────────
-  // Scope all selectors by wrapping in a container class
-  const scopeClass = `${camelToKebab(name)}-root`;
-  let css = scopedCss || "";
+  // ── CSS variables injection ────────────────────────────────────────
+  let cssVarStyle = "";
+  if (cssVars && Object.keys(cssVars).length > 0) {
+    const varDecls = Object.entries(cssVars)
+      .map(([k, v]) => `"${k}": "${v}"`)
+      .join(", ");
+    cssVarStyle = `\n        style={{ ${varDecls} }}`;
+  }
 
-  // ── Build the component TSX ────────────────────────────────────────
+  // ── Scope class ───────────────────────────────────────────────────
+  const scopeClass = `${camelToKebab(name)}-root`;
+  const css = scopedCss || "";
+
+  // ── Build component TSX ────────────────────────────────────────────
+  const reducedMotionImport = hasAnimations
+    ? ""
+    : 'import { useReducedMotion } from "@uilibrary/hooks/use-reduced-motion";';
+
   const tsx = `"use client";
 
 import { forwardRef, type HTMLAttributes } from "react";
 import { cn } from "@uilibrary/utils";
-import { useReducedMotion } from "@uilibrary/hooks/use-reduced-motion";
-${motionImport}
+${hasAnimations ? motionImport : reducedMotionImport}
 
 export interface ${name}Props extends HTMLAttributes<HTMLDivElement> {
 ${propsInterface || "  // No detected props — add your own"}
@@ -70,27 +84,24 @@ ${propsInterface || "  // No detected props — add your own"}
 
 export const ${name} = forwardRef<HTMLDivElement, ${name}Props>(
   ({ ${propsDestructure ? propsDestructure + ", " : ""}className, ...rest }, ref) => {
-    const prefersReduced = useReducedMotion();
-
     return (
-      <div ref={ref} className={cn("${scopeClass}", className)} {...rest}>
+      <${wrapperTag}
+        ref={ref}
+        className={cn("${scopeClass}", className)}${wrapperAnimProps}${cssVarStyle}
+        {...rest}
+      >
         ${jsx}
-      </div>
+      </${wrapperTag}>
     );
   }
 );
 ${name}.displayName = "${name}";
-${motionCode}`;
+${motionVariants}`;
 
-  return {
-    tsx,
-    css,
-    props,
-    defaultProps: defaultPropsObj,
-  };
+  return { tsx, css, props, defaultProps: defaultPropsObj };
 }
 
-// ── HTML → JSX conversion ────────────────────────────────────────────
+// ── HTML → JSX ───────────────────────────────────────────────────────
 
 function htmlToJsx(html) {
   let jsx = html;
@@ -115,20 +126,22 @@ function htmlToJsx(html) {
   jsx = jsx.replace(/\bcolspan="/g, 'colSpan="');
   jsx = jsx.replace(/\browspan="/g, 'rowSpan="');
 
-  // autocomplete → autoComplete
+  // autocomplete → autoComplete, autofocus → autoFocus
   jsx = jsx.replace(/\bautocomplete="/g, 'autoComplete="');
+  jsx = jsx.replace(/\bautofocus\b/g, 'autoFocus');
 
   // style="..." → style={{ ... }}
-  jsx = jsx.replace(/\bstyle="([^"]*)"/g, (match, styleStr) => {
+  jsx = jsx.replace(/\bstyle="([^"]*)"/g, (_, styleStr) => {
     const obj = styleStringToObject(styleStr);
     return `style={${JSON.stringify(obj)}}`;
   });
 
-  // Remove data-mx-* attributes (our internal markers)
-  jsx = jsx.replace(/\s*data-mx-[\w-]+="[^"]*"/g, "");
+  // Remove internal capture markers
+  jsx = jsx.replace(/\s*data-mx-[\w-]+(?:="[^"]*")?/g, "");
+  jsx = jsx.replace(/\s*data-mx-[\w-]+(?:='[^']*')?/g, "");
 
   // Boolean attributes
-  jsx = jsx.replace(/\b(disabled|checked|selected|readonly|required|hidden|autoplay|muted|loop|controls)(?=[\s>])/g, '$1={true}');
+  jsx = jsx.replace(/\b(disabled|checked|selected|readonly|required|hidden|autoplay|muted|loop|controls)(?=[\s/>])/g, '$1={true}');
 
   // Comments
   jsx = jsx.replace(/<!--([\s\S]*?)-->/g, '{/* $1 */}');
@@ -138,14 +151,12 @@ function htmlToJsx(html) {
 
 function styleStringToObject(styleStr) {
   const obj = {};
-  const declarations = styleStr.split(";").filter(Boolean);
-  for (const decl of declarations) {
+  for (const decl of styleStr.split(";")) {
     const idx = decl.indexOf(":");
     if (idx < 0) continue;
     const prop = decl.slice(0, idx).trim();
     const val = decl.slice(idx + 1).trim();
     if (!prop || !val) continue;
-    // Convert CSS prop to camelCase
     const camelProp = prop.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
     obj[camelProp] = val;
   }
@@ -154,101 +165,87 @@ function styleStringToObject(styleStr) {
 
 // ── Props detection ──────────────────────────────────────────────────
 
-function detectProps(jsx) {
+function detectProps(jsx, images) {
   const props = [];
   let propIdx = 0;
 
-  // Detect heading text content
-  const headingRegex = /<h([1-6])[^>]*>([^<]{3,80})<\/h[1-6]>/gi;
+  // Headings
+  const headingRegex = /<h([1-6])[^>]*>([^<]{3,120})<\/h[1-6]>/gi;
   let match;
   while ((match = headingRegex.exec(jsx)) !== null) {
     const level = match[1];
     const text = match[2].trim();
     if (text.length < 3) continue;
-    const name = level === "1" ? "headline" : level === "2" ? "subheadline" : `heading${propIdx}`;
-    props.push({
-      name: props.some(p => p.name === name) ? name + propIdx : name,
-      type: "text",
-      tsType: "string",
-      label: `Heading ${level} text`,
-      defaultValue: text,
-    });
+    const baseName = level === "1" ? "headline" : level === "2" ? "subheadline" : `heading${propIdx}`;
+    const name = props.some(p => p.name === baseName) ? `${baseName}${propIdx}` : baseName;
+    props.push({ name, type: "text", tsType: "string", label: `Heading ${level}`, defaultValue: text });
     propIdx++;
   }
 
-  // Detect paragraph text (first 2 paragraphs only)
-  const pRegex = /<p[^>]*>([^<]{10,200})<\/p>/gi;
+  // Paragraphs (first 2)
+  const pRegex = /<p[^>]*>([^<]{10,300})<\/p>/gi;
   let pCount = 0;
   while ((match = pRegex.exec(jsx)) !== null && pCount < 2) {
     const text = match[1].trim();
-    props.push({
-      name: pCount === 0 ? "description" : `paragraph${pCount}`,
-      type: "text",
-      tsType: "string",
-      label: "Paragraph text",
-      defaultValue: text,
-    });
-    pCount++;
-    propIdx++;
+    const name = pCount === 0 ? "description" : `paragraph${pCount}`;
+    props.push({ name, type: "text", tsType: "string", label: "Paragraph", defaultValue: text });
+    pCount++; propIdx++;
   }
 
-  // Detect button/link text
-  const btnRegex = /<(?:button|a)[^>]*>([^<]{2,40})<\/(?:button|a)>/gi;
+  // Buttons / links text (first 3)
+  const btnRegex = /<(?:button|a)[^>]*>([^<]{2,60})<\/(?:button|a)>/gi;
   let btnCount = 0;
   while ((match = btnRegex.exec(jsx)) !== null && btnCount < 3) {
     const text = match[1].trim();
     if (text.length < 2) continue;
-    props.push({
-      name: btnCount === 0 ? "ctaLabel" : `buttonLabel${btnCount}`,
-      type: "text",
-      tsType: "string",
-      label: "Button/link text",
-      defaultValue: text,
-    });
-    btnCount++;
-    propIdx++;
+    const name = btnCount === 0 ? "ctaLabel" : `buttonLabel${btnCount}`;
+    props.push({ name, type: "text", tsType: "string", label: "Button text", defaultValue: text });
+    btnCount++; propIdx++;
   }
 
-  // Detect images
-  const imgRegex = /src="(https?:\/\/[^"]+)"/gi;
-  let imgCount = 0;
-  while ((match = imgRegex.exec(jsx)) !== null && imgCount < 5) {
-    props.push({
-      name: imgCount === 0 ? "imageSrc" : `image${imgCount}Src`,
-      type: "image",
-      tsType: "string",
-      label: "Image source",
-      defaultValue: match[1],
+  // Images — prefer the images array (already resolved URLs) over src attributes in JSX
+  // since JSX may contain long base64 data URIs that shouldn't become default prop values.
+  const imageUrls = (images || [])
+    .filter(img => img.url && !img.url.startsWith("data:"))
+    .map(img => img.url);
+
+  if (imageUrls.length > 0) {
+    imageUrls.slice(0, 5).forEach((url, i) => {
+      const name = i === 0 ? "imageSrc" : `image${i}Src`;
+      props.push({ name, type: "image", tsType: "string", label: "Image URL", defaultValue: url });
+      propIdx++;
     });
-    imgCount++;
-    propIdx++;
+  } else {
+    // Fallback: scan src attributes that look like real URLs (not data URIs)
+    const imgRegex = /src="(https?:\/\/[^"]{4,300})"/gi;
+    let imgCount = 0;
+    while ((match = imgRegex.exec(jsx)) !== null && imgCount < 5) {
+      const name = imgCount === 0 ? "imageSrc" : `image${imgCount}Src`;
+      props.push({ name, type: "image", tsType: "string", label: "Image URL", defaultValue: match[1] });
+      imgCount++; propIdx++;
+    }
   }
 
-  // Detect links
-  const hrefRegex = /href="(https?:\/\/[^"]+)"/gi;
+  // External href links (first 3)
+  const hrefRegex = /href="(https?:\/\/[^"]{4,300})"/gi;
   let hrefCount = 0;
   while ((match = hrefRegex.exec(jsx)) !== null && hrefCount < 3) {
-    props.push({
-      name: hrefCount === 0 ? "ctaHref" : `link${hrefCount}Href`,
-      type: "href",
-      tsType: "string",
-      label: "Link URL",
-      defaultValue: match[1],
-    });
-    hrefCount++;
-    propIdx++;
+    const name = hrefCount === 0 ? "ctaHref" : `link${hrefCount}Href`;
+    props.push({ name, type: "href", tsType: "string", label: "Link URL", defaultValue: match[1] });
+    hrefCount++; propIdx++;
   }
 
   return props;
 }
 
-// ── WAAPI → Framer Motion ────────────────────────────────────────────
+// ── WAAPI → Framer Motion variants ──────────────────────────────────
 
 function wapiAnimationsToFramer(animations) {
   if (!animations || animations.length === 0) return "";
 
-  let code = "\n// Framer Motion variants extracted from WAAPI animations\n";
-  for (let i = 0; i < animations.length; i++) {
+  let code = "\n// Framer Motion variants — extracted from WAAPI animations\n";
+
+  for (let i = 0; i < Math.min(animations.length, 8); i++) {
     const a = animations[i];
     const varName = `anim${i}`;
     const kfs = a.keyframes || [];
@@ -257,52 +254,174 @@ function wapiAnimationsToFramer(animations) {
     const first = kfs[0];
     const last = kfs[kfs.length - 1];
 
-    // Build initial and animate objects
     const initial = {};
     const animate = {};
 
     for (const [key, val] of Object.entries(first)) {
-      if (key === "offset" || key === "easing") continue;
+      if (key === "offset" || key === "easing" || key === "composite") continue;
       const camel = key.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-      // Map web animation props to Framer props
-      if (camel === "transform") {
-        parseTransform(val, initial);
-      } else {
-        initial[camel] = val;
-      }
+      if (camel === "transform") parseTransform(val, initial);
+      else initial[camel] = val;
     }
     for (const [key, val] of Object.entries(last)) {
-      if (key === "offset" || key === "easing") continue;
+      if (key === "offset" || key === "easing" || key === "composite") continue;
       const camel = key.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-      if (camel === "transform") {
-        parseTransform(val, animate);
-      } else {
-        animate[camel] = val;
+      if (camel === "transform") parseTransform(val, animate);
+      else animate[camel] = val;
+    }
+
+    // Build intermediate keyframes for multi-stop animations
+    const keyframesObj = {};
+    if (kfs.length > 2) {
+      const allProps = new Set(
+        kfs.flatMap(kf => Object.keys(kf).filter(k => k !== "offset" && k !== "easing" && k !== "composite"))
+      );
+      for (const prop of allProps) {
+        const camel = prop.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+        const vals = kfs.map(kf => {
+          const v = kf[prop];
+          if (v == null) return null;
+          if (camel === "transform") {
+            const t = {};
+            parseTransform(v, t);
+            return Object.keys(t).length === 1 ? Object.values(t)[0] : v;
+          }
+          return v;
+        });
+        if (vals.some(v => v != null)) {
+          keyframesObj[camel] = vals.filter(v => v != null);
+        }
       }
     }
 
     const dur = (a.duration || 300) / 1000;
     const delay = (a.delay || 0) / 1000;
+    const iterations = a.timing?.iterations === Infinity || a.timing?.iterations === null
+      ? "Infinity"
+      : String(a.timing?.iterations ?? 1);
+
+    const transition = {
+      duration: dur,
+      delay,
+      ease: normalizeEasing(a.easing || a.timing?.easing || "ease"),
+      ...(iterations !== "1" ? { repeat: "Infinity", repeatType: "loop" } : {}),
+    };
 
     code += `const ${varName} = {\n`;
     code += `  initial: ${JSON.stringify(initial)},\n`;
-    code += `  animate: ${JSON.stringify(animate)},\n`;
-    code += `  transition: { duration: ${dur}, delay: ${delay}, ease: ${JSON.stringify(a.easing || "easeOut")} },\n`;
+    if (Object.keys(keyframesObj).length > 0) {
+      code += `  animate: ${JSON.stringify(keyframesObj)},\n`;
+    } else {
+      code += `  animate: ${JSON.stringify(animate)},\n`;
+    }
+    code += `  transition: ${JSON.stringify(transition)},\n`;
     code += `};\n`;
   }
+
   return code;
 }
 
 function parseTransform(val, target) {
   if (!val || val === "none") return;
-  const translateX = /translateX\(([^)]+)\)/.exec(val);
-  const translateY = /translateY\(([^)]+)\)/.exec(val);
-  const scale = /scale\(([^)]+)\)/.exec(val);
-  const rotate = /rotate\(([^)]+)\)/.exec(val);
-  if (translateX) target.x = parseFloat(translateX[1]) || 0;
-  if (translateY) target.y = parseFloat(translateY[1]) || 0;
-  if (scale) target.scale = parseFloat(scale[1]) || 1;
-  if (rotate) target.rotate = parseFloat(rotate[1]) || 0;
+
+  // matrix3d(16 values)
+  const mat3d = /matrix3d\(([^)]+)\)/.exec(val);
+  if (mat3d) {
+    // Extract translation from matrix3d (indices 12, 13, 14)
+    const v = mat3d[1].split(",").map(n => parseFloat(n.trim()));
+    if (v.length === 16) {
+      if (v[12]) target.x = v[12];
+      if (v[13]) target.y = v[13];
+    }
+    return;
+  }
+
+  // matrix(a,b,c,d,e,f) — 2D
+  const mat = /\bmatrix\(([^)]+)\)/.exec(val);
+  if (mat) {
+    const v = mat[1].split(",").map(n => parseFloat(n.trim()));
+    if (v.length === 6) {
+      if (v[4]) target.x = v[4];
+      if (v[5]) target.y = v[5];
+      // Extract rotation from matrix if no separate rotate
+      const angle = Math.atan2(v[1], v[0]) * (180 / Math.PI);
+      if (Math.abs(angle) > 0.01) target.rotate = Math.round(angle * 100) / 100;
+    }
+    return;
+  }
+
+  // translate3d(x, y, z)
+  const t3d = /translate3d\(([^,]+),\s*([^,]+),\s*([^)]+)\)/.exec(val);
+  if (t3d) {
+    const x = parseFloat(t3d[1]);
+    const y = parseFloat(t3d[2]);
+    if (x) target.x = x;
+    if (y) target.y = y;
+  }
+
+  // translate(x[, y])
+  const t2 = /(?<![a-zA-Z])translate\(([^,)]+)(?:,\s*([^)]+))?\)/.exec(val);
+  if (t2) {
+    const x = parseFloat(t2[1]);
+    const y = t2[2] ? parseFloat(t2[2]) : 0;
+    if (x) target.x = x;
+    if (y) target.y = y;
+  }
+
+  // translateX / translateY
+  const tx = /translateX\(([^)]+)\)/.exec(val);
+  const ty = /translateY\(([^)]+)\)/.exec(val);
+  if (tx) target.x = parseFloat(tx[1]) || 0;
+  if (ty) target.y = parseFloat(ty[1]) || 0;
+
+  // scale(x[, y]) — handles uniform and non-uniform
+  const sc = /(?<![a-zA-Z])scale\(([^)]+)\)/.exec(val);
+  if (sc) {
+    const parts = sc[1].split(",").map(n => parseFloat(n.trim()));
+    target.scale = parts[0] || 1;
+    if (parts[1] !== undefined && parts[1] !== parts[0]) target.scaleY = parts[1];
+  }
+  const scx = /scaleX\(([^)]+)\)/.exec(val);
+  const scy = /scaleY\(([^)]+)\)/.exec(val);
+  if (scx && !sc) target.scaleX = parseFloat(scx[1]) || 1;
+  if (scy && !sc) target.scaleY = parseFloat(scy[1]) || 1;
+
+  // rotate / rotateZ
+  const rot = /(?:rotate|rotateZ)\(([^)]+)\)/.exec(val);
+  if (rot) {
+    const rv = rot[1].trim();
+    if (rv.endsWith("deg")) target.rotate = parseFloat(rv);
+    else if (rv.endsWith("rad")) target.rotate = Math.round(parseFloat(rv) * (180 / Math.PI) * 100) / 100;
+    else if (rv.endsWith("turn")) target.rotate = parseFloat(rv) * 360;
+    else target.rotate = parseFloat(rv) || 0;
+  }
+
+  // skewX / skewY
+  const skx = /skewX\(([^)]+)\)/.exec(val);
+  const sky = /skewY\(([^)]+)\)/.exec(val);
+  if (skx) target.skewX = parseFloat(skx[1]) || 0;
+  if (sky) target.skewY = parseFloat(sky[1]) || 0;
+
+  // perspective — pass through as string (Framer doesn't have a direct prop)
+  const persp = /perspective\(([^)]+)\)/.exec(val);
+  if (persp && Object.keys(target).length === 0) {
+    target.perspective = parseFloat(persp[1]) || 0;
+  }
+}
+
+function normalizeEasing(easing) {
+  if (!easing) return "easeOut";
+  if (easing.startsWith("cubic-bezier")) return easing;
+  const map = {
+    "linear": "linear",
+    "ease": "easeInOut",
+    "ease-in": "easeIn",
+    "ease-out": "easeOut",
+    "ease-in-out": "easeInOut",
+    "step-start": "steps(1, start)",
+    "step-end": "steps(1, end)",
+  };
+  return map[easing] || "easeOut";
 }
 
 // ── Utilities ────────────────────────────────────────────────────────
