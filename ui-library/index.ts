@@ -44,6 +44,11 @@ export { TiltCard } from "./components/tilt-card";
 
 // Sections
 export { HeroSection } from "./sections/hero-section";
+export { HeroSpotlight } from "./sections/hero-spotlight";
+export { HeroSplit } from "./sections/hero-split";
+export { HeroBento } from "./sections/hero-bento";
+export { HeroAurora } from "./sections/hero-aurora";
+export { HeroRotating } from "./sections/hero-rotating";
 export { HeroAavePro } from "./sections/hero-aave-pro";
 export { CTASection } from "./sections/cta-section";
 export { FAQSection } from "./sections/faq-section";
