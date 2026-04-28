@@ -2,6 +2,7 @@
 
 import { motion } from "motion/react";
 import { cn } from "@uilibrary/utils";
+import { useReducedMotion } from "@uilibrary/hooks/use-reduced-motion";
 
 export interface TextSpringCharsProps {
   children: string;
@@ -20,18 +21,19 @@ export function TextSpringChars({
   damping = 25,
   className,
 }: TextSpringCharsProps) {
+  const prefersReducedMotion = useReducedMotion();
   const chars = children.split("");
 
   return (
     <Tag className={cn(className)}>
       <motion.span
         className="inline"
-        initial="hidden"
+        initial={prefersReducedMotion ? "visible" : "hidden"}
         whileInView="visible"
         viewport={{ once: true, margin: "-10%" }}
         variants={{
           hidden: {},
-          visible: { transition: { staggerChildren: staggerDelay } },
+          visible: { transition: { staggerChildren: prefersReducedMotion ? 0 : staggerDelay } },
         }}
       >
         {chars.map((char, i) => (
@@ -41,19 +43,17 @@ export function TextSpringChars({
               style={{ whiteSpace: "pre" }}
               variants={{
                 hidden: {
-                  y: "120%",
-                  rotateX: 90,
-                  opacity: 0,
+                  y: prefersReducedMotion ? "0%" : "120%",
+                  rotateX: prefersReducedMotion ? 0 : 90,
+                  opacity: prefersReducedMotion ? 1 : 0,
                 },
                 visible: {
                   y: "0%",
                   rotateX: 0,
                   opacity: 1,
-                  transition: {
-                    type: "spring",
-                    stiffness,
-                    damping,
-                  },
+                  transition: prefersReducedMotion
+                    ? { duration: 0 }
+                    : { type: "spring", stiffness, damping },
                 },
               }}
             >

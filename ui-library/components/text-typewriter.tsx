@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { motion, useInView } from "motion/react";
 import { cn } from "@uilibrary/utils";
 import { useRef } from "react";
+import { useReducedMotion } from "@uilibrary/hooks/use-reduced-motion";
 
 export interface TextTypewriterProps {
   text: string | string[];
@@ -30,6 +31,7 @@ export function TextTypewriter({
   className,
   cursorClassName,
 }: TextTypewriterProps) {
+  const prefersReducedMotion = useReducedMotion();
   const texts = Array.isArray(text) ? text : [text];
   const [displayed, setDisplayed] = useState("");
   const [textIndex, setTextIndex] = useState(0);
@@ -41,6 +43,11 @@ export function TextTypewriter({
     if (!isInView) return;
 
     const current = texts[textIndex];
+
+    if (prefersReducedMotion) {
+      setDisplayed(current);
+      return;
+    }
 
     if (!isDeleting) {
       if (displayed.length < current.length) {
@@ -67,12 +74,12 @@ export function TextTypewriter({
 
     setIsDeleting(false);
     setTextIndex((prev) => (prev + 1) % texts.length);
-  }, [displayed, isDeleting, textIndex, isInView, texts, speed, deleteSpeed, pauseDuration, loop]);
+  }, [displayed, isDeleting, textIndex, isInView, texts, speed, deleteSpeed, pauseDuration, loop, prefersReducedMotion]);
 
   return (
     <Tag ref={ref as any} className={cn("inline-flex", className)}>
       <span>{displayed}</span>
-      {cursor && (
+      {cursor && !prefersReducedMotion && (
         <motion.span
           className={cn("ml-0.5 font-light", cursorClassName)}
           animate={{ opacity: [1, 0] }}

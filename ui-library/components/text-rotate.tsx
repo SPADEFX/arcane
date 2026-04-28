@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@uilibrary/utils";
+import { useReducedMotion } from "@uilibrary/hooks/use-reduced-motion";
 
 export interface TextRotateProps {
   words: string[];
@@ -48,6 +49,7 @@ export function TextRotate({
   className,
   wordClassName,
 }: TextRotateProps) {
+  const prefersReducedMotion = useReducedMotion();
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
@@ -67,10 +69,10 @@ export function TextRotate({
           <motion.span
             key={words[index]}
             className={cn("inline-block", wordClassName)}
-            initial={anim.initial}
-            animate={anim.animate}
-            exit={anim.exit}
-            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            initial={prefersReducedMotion ? {} : anim.initial}
+            animate={prefersReducedMotion ? {} : anim.animate}
+            exit={prefersReducedMotion ? {} : anim.exit}
+            transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
           >
             {words[index]}
           </motion.span>

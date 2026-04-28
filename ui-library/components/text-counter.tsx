@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { motion, useMotionValue, useTransform, animate, useInView } from "motion/react";
 import { cn } from "@uilibrary/utils";
+import { useReducedMotion } from "@uilibrary/hooks/use-reduced-motion";
 
 export interface TextCounterProps {
   from?: number;
@@ -25,6 +26,7 @@ export function TextCounter({
   separator = true,
   className,
 }: TextCounterProps) {
+  const prefersReducedMotion = useReducedMotion();
   const ref = useRef<HTMLSpanElement>(null);
   const isInView = useInView(ref, { once: true, margin: "-10%" });
   const count = useMotionValue(from);
@@ -40,11 +42,11 @@ export function TextCounter({
   useEffect(() => {
     if (!isInView) return;
     const controls = animate(count, to, {
-      duration,
+      duration: prefersReducedMotion ? 0 : duration,
       ease: [0.22, 1, 0.36, 1],
     });
     return () => controls.stop();
-  }, [isInView, count, to, duration]);
+  }, [isInView, count, to, duration, prefersReducedMotion]);
 
   return (
     <motion.span ref={ref} className={cn("tabular-nums", className)}>

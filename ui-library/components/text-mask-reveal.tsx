@@ -2,6 +2,7 @@
 
 import { motion } from "motion/react";
 import { cn } from "@uilibrary/utils";
+import { useReducedMotion } from "@uilibrary/hooks/use-reduced-motion";
 
 export interface TextMaskRevealProps {
   children: string;
@@ -39,24 +40,23 @@ export function TextMaskReveal({
   delay = 0,
   className,
 }: TextMaskRevealProps) {
+  const prefersReducedMotion = useReducedMotion();
   const clip = clipPaths[direction];
 
   return (
     <Tag className={cn(className)}>
       <motion.span
         className="inline-block"
-        initial="hidden"
+        initial={prefersReducedMotion ? "visible" : "hidden"}
         whileInView="visible"
         viewport={{ once: true, margin: "-10%" }}
         variants={{
           hidden: { clipPath: clip.hidden },
           visible: {
             clipPath: clip.visible,
-            transition: {
-              duration,
-              delay,
-              ease: [0.22, 1, 0.36, 1],
-            },
+            transition: prefersReducedMotion
+              ? { duration: 0 }
+              : { duration, delay, ease: [0.22, 1, 0.36, 1] },
           },
         }}
       >

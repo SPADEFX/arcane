@@ -3,6 +3,7 @@
 import { type ReactNode } from "react";
 import { motion } from "motion/react";
 import { cn } from "@uilibrary/utils";
+import { useReducedMotion } from "@uilibrary/hooks/use-reduced-motion";
 
 export interface TextRevealProps {
   children: string;
@@ -19,6 +20,7 @@ export function TextReveal({
   staggerDelay = 0.04,
   className,
 }: TextRevealProps) {
+  const prefersReducedMotion = useReducedMotion();
   const units =
     by === "word" ? children.split(" ") : children.split("");
 
@@ -26,14 +28,14 @@ export function TextReveal({
     <Tag className={cn("overflow-hidden", className)}>
       <motion.span
         className="inline"
-        initial="hidden"
+        initial={prefersReducedMotion ? "visible" : "hidden"}
         whileInView="visible"
         viewport={{ once: true, margin: "-10%" }}
         variants={{
           hidden: {},
           visible: {
             transition: {
-              staggerChildren: staggerDelay,
+              staggerChildren: prefersReducedMotion ? 0 : staggerDelay,
             },
           },
         }}
@@ -43,14 +45,16 @@ export function TextReveal({
             <motion.span
               className="inline-block"
               variants={{
-                hidden: { y: "110%", opacity: 0 },
+                hidden: {
+                  y: prefersReducedMotion ? "0%" : "110%",
+                  opacity: prefersReducedMotion ? 1 : 0,
+                },
                 visible: {
                   y: "0%",
                   opacity: 1,
-                  transition: {
-                    duration: 0.5,
-                    ease: [0.22, 1, 0.36, 1],
-                  },
+                  transition: prefersReducedMotion
+                    ? { duration: 0 }
+                    : { duration: 0.5, ease: [0.22, 1, 0.36, 1] },
                 },
               }}
             >

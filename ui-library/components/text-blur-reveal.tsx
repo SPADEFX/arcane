@@ -2,6 +2,7 @@
 
 import { motion } from "motion/react";
 import { cn } from "@uilibrary/utils";
+import { useReducedMotion } from "@uilibrary/hooks/use-reduced-motion";
 
 export interface TextBlurRevealProps {
   children: string;
@@ -18,19 +19,20 @@ export function TextBlurReveal({
   staggerDelay = 0.06,
   className,
 }: TextBlurRevealProps) {
+  const prefersReducedMotion = useReducedMotion();
   const units = by === "word" ? children.split(" ") : children.split("");
 
   return (
     <Tag className={cn(className)}>
       <motion.span
         className="inline"
-        initial="hidden"
+        initial={prefersReducedMotion ? "visible" : "hidden"}
         whileInView="visible"
         viewport={{ once: true, margin: "-10%" }}
         variants={{
           hidden: {},
           visible: {
-            transition: { staggerChildren: staggerDelay },
+            transition: { staggerChildren: prefersReducedMotion ? 0 : staggerDelay },
           },
         }}
       >
@@ -48,10 +50,9 @@ export function TextBlurReveal({
                 opacity: 1,
                 filter: "blur(0px)",
                 y: 0,
-                transition: {
-                  duration: 0.6,
-                  ease: [0.22, 1, 0.36, 1],
-                },
+                transition: prefersReducedMotion
+                  ? { duration: 0 }
+                  : { duration: 0.6, ease: [0.22, 1, 0.36, 1] },
               },
             }}
           >

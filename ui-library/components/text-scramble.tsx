@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useInView } from "motion/react";
 import { cn } from "@uilibrary/utils";
+import { useReducedMotion } from "@uilibrary/hooks/use-reduced-motion";
 
 const CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%&*";
 
@@ -25,6 +26,7 @@ export function TextScramble({
   className,
   charSet = CHARS,
 }: TextScrambleProps) {
+  const prefersReducedMotion = useReducedMotion();
   const [displayed, setDisplayed] = useState(children);
   const [isScrambling, setIsScrambling] = useState(false);
   const ref = useRef<HTMLElement>(null);
@@ -32,6 +34,10 @@ export function TextScramble({
   const hasAnimated = useRef(false);
 
   const scramble = useCallback(() => {
+    if (prefersReducedMotion) {
+      setDisplayed(children);
+      return;
+    }
     if (isScrambling) return;
     setIsScrambling(true);
 
@@ -61,16 +67,20 @@ export function TextScramble({
         setIsScrambling(false);
       }
     }, speed);
-  }, [children, speed, scrambleDuration, charSet, isScrambling]);
+  }, [children, speed, scrambleDuration, charSet, isScrambling, prefersReducedMotion]);
 
   useEffect(() => {
     if (trigger === "inView" && isInView && !hasAnimated.current) {
       hasAnimated.current = true;
+      if (prefersReducedMotion) {
+        setDisplayed(children);
+        return;
+      }
       setDisplayed(charSet.slice(0, children.length).split("").map(() => charSet[Math.floor(Math.random() * charSet.length)]).join(""));
       const timeout = setTimeout(scramble, 100);
       return () => clearTimeout(timeout);
     }
-  }, [isInView, trigger, scramble, children.length, charSet]);
+  }, [isInView, trigger, scramble, children.length, charSet, prefersReducedMotion, children]);
 
   return (
     <Tag

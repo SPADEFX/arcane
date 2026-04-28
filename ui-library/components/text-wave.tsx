@@ -2,6 +2,7 @@
 
 import { motion } from "motion/react";
 import { cn } from "@uilibrary/utils";
+import { useReducedMotion } from "@uilibrary/hooks/use-reduced-motion";
 
 export interface TextWaveProps {
   children: string;
@@ -22,10 +23,12 @@ export function TextWave({
   trigger = "inView",
   className,
 }: TextWaveProps) {
+  const prefersReducedMotion = useReducedMotion();
   const chars = children.split("");
 
-  const wrapperProps =
-    trigger === "inView"
+  const wrapperProps = prefersReducedMotion
+    ? { initial: "visible" as const, animate: "visible" as const }
+    : trigger === "inView"
       ? {
           initial: "hidden" as const,
           whileInView: "visible" as const,
@@ -41,7 +44,7 @@ export function TextWave({
         className="inline-flex"
         variants={{
           hidden: {},
-          visible: { transition: { staggerChildren: staggerDelay } },
+          visible: { transition: { staggerChildren: prefersReducedMotion ? 0 : staggerDelay } },
         }}
         {...wrapperProps}
       >
@@ -53,11 +56,10 @@ export function TextWave({
             variants={{
               hidden: { y: 0 },
               visible: {
-                y: [0, -amplitude, 0],
-                transition: {
-                  duration,
-                  ease: [0.22, 1, 0.36, 1],
-                },
+                y: prefersReducedMotion ? 0 : [0, -amplitude, 0],
+                transition: prefersReducedMotion
+                  ? { duration: 0 }
+                  : { duration, ease: [0.22, 1, 0.36, 1] },
               },
             }}
           >

@@ -26,7 +26,7 @@ export function AuroraBackground({
       {colors.map((color, i) => (
         <div
           key={i}
-          className="absolute rounded-full opacity-30"
+          className="absolute rounded-full opacity-30 aurora-blob"
           style={{
             background: `radial-gradient(circle, ${color} 0%, transparent 70%)`,
             width: "60%",
@@ -35,11 +35,16 @@ export function AuroraBackground({
             top: `${10 + (i % 2) * 30}%`,
             filter: "blur(80px)",
             animation: `aurora-${i} ${duration} ease-in-out infinite`,
-            mixBlendMode: "screen",
           }}
         />
       ))}
       <style>{`
+        .aurora-blob { mix-blend-mode: multiply; }
+        [data-theme="dark"] .aurora-blob,
+        .dark .aurora-blob { mix-blend-mode: screen; }
+        @media (prefers-color-scheme: dark) {
+          .aurora-blob { mix-blend-mode: screen; }
+        }
         @keyframes aurora-0 {
           0%, 100% { transform: translate(0, 0) rotate(0deg) scale(1); }
           33% { transform: translate(30%, 20%) rotate(120deg) scale(1.1); }

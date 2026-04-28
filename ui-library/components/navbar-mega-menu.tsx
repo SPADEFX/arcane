@@ -77,7 +77,7 @@ function DropdownArrow() {
 
 /* ─── Ping Badge ─────────────────────────────── */
 
-export function PingBadge({ color = "#9898ff" }: { color?: string }) {
+export function PingBadge({ color = "var(--color-accent)" }: { color?: string }) {
   return (
     <span className="relative ml-1 inline-flex h-[7px] w-[7px]">
       <span
@@ -128,7 +128,7 @@ function CtaDropdown({
           padding: "9px 16px",
           borderRadius: 50,
           background: "var(--color-text)",
-          color: "var(--color-bg, #ffffff)",
+          color: "var(--color-bg)",
           fontSize: 14,
           fontWeight: 500,
           lineHeight: "105%",
@@ -173,13 +173,13 @@ function CtaDropdown({
                 justifyContent: "space-between",
                 padding: "10px 14px",
                 borderRadius: 10,
-                color: "#fff",
+                color: "var(--color-text)",
                 textDecoration: "none",
                 fontSize: 14,
                 fontWeight: 450,
                 transition: "background 0.12s ease",
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "color-mix(in srgb, var(--color-text) 6%, transparent)"; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
             >
               <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -191,8 +191,8 @@ function CtaDropdown({
                       fontWeight: 600,
                       padding: "1px 6px",
                       borderRadius: 6,
-                      background: "rgba(152,152,255,0.15)",
-                      color: "#9898ff",
+                      background: "color-mix(in srgb, var(--color-accent) 15%, transparent)",
+                      color: "var(--color-accent)",
                     }}
                   >
                     {item.badge}
@@ -201,7 +201,7 @@ function CtaDropdown({
               </span>
               {item.external && (
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                  <path d="M4.5 2.5h5v5M9.5 2.5L2.5 9.5" stroke="rgba(255,255,255,0.3)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M4.5 2.5h5v5M9.5 2.5L2.5 9.5" stroke="color-mix(in srgb, var(--color-text) 30%, transparent)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               )}
             </a>
@@ -495,7 +495,7 @@ export function NavbarMegaMenu({
                 }}
               >
                 {entry.label}
-                {shouldShowBadge ? <PingBadge color="#9898ff" /> : entry.badge}
+                {shouldShowBadge ? <PingBadge /> : entry.badge}
               </button>
             ) : (
               <a
@@ -559,7 +559,7 @@ export function NavbarMegaMenu({
                   padding: "9px 16px",
                   borderRadius: 50,
                   background: "var(--color-text)",
-                  color: "var(--color-bg, #ffffff)",
+                  color: "var(--color-bg)",
                   fontSize: 14,
                   fontWeight: 500,
                   lineHeight: "105%",
@@ -657,8 +657,8 @@ export function NavbarMegaMenu({
             right: 0,
             bottom: 0,
             zIndex: 999,
-            background: "var(--color-bg, #0f0f10)",
-            color: "var(--color-text, #fff)",
+            background: "var(--color-bg)",
+            color: "var(--color-text)",
             fontFamily: "var(--font-sans, 'Inter', system-ui, -apple-system, sans-serif)",
             display: "flex",
             flexDirection: "column",
@@ -707,8 +707,8 @@ export function NavbarMegaMenu({
                             width: 48,
                             height: 48,
                             borderRadius: 12,
-                            background: "rgba(255,255,255,0.04)",
-                            border: "1px solid rgba(255,255,255,0.06)",
+                            background: "color-mix(in srgb, var(--color-text) 4%, transparent)",
+                            border: "1px solid color-mix(in srgb, var(--color-text) 6%, transparent)",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
@@ -803,7 +803,7 @@ export function NavbarMegaMenu({
         {/* Arrow — outside the clipped panel so it's always visible */}
         <motion.div
           ref={arrowRef}
-          animate={{ left: arrowLeft }}
+          animate={{ x: arrowLeft }}
           transition={isFirstOpen.current
             ? { duration: 0 }
             : { type: "spring", stiffness: 200, damping: 28, mass: 0.8 }
@@ -974,7 +974,7 @@ export function NavbarMegaMenu({
                                   alignItems: "center",
                                   justifyContent: "center",
                                   flexShrink: 0,
-                                  color: isHovered && item.accentColor ? item.accentColor : "#b0afad",
+                                  color: isHovered && item.accentColor ? item.accentColor : "var(--color-text-secondary)",
                                   transition: "color 0.2s ease",
                                 }}
                               >
@@ -1011,8 +1011,8 @@ export function NavbarMegaMenu({
                                       fontWeight: 500,
                                       padding: "3px 8px",
                                       borderRadius: 4,
-                                      background: "#9898ff",
-                                      color: "#fff",
+                                      background: "var(--color-accent)",
+                                      color: "var(--color-text-inverse)",
                                     }}
                                   >
                                     New
@@ -1033,7 +1033,7 @@ export function NavbarMegaMenu({
                                     fontWeight: 400,
                                     lineHeight: "150%",
                                     letterSpacing: "-0.09px",
-                                    color: "var(--color-text-secondary, #636161)",
+                                    color: "var(--color-text-secondary)",
                                     whiteSpace: "nowrap",
                                   }}
                                 >

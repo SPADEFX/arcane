@@ -2,6 +2,7 @@
 
 import { motion } from "motion/react";
 import { cn } from "@uilibrary/utils";
+import { useReducedMotion } from "@uilibrary/hooks/use-reduced-motion";
 
 export interface TextHighlightProps {
   children: string;
@@ -20,6 +21,7 @@ export function TextHighlight({
   duration = 0.8,
   className,
 }: TextHighlightProps) {
+  const prefersReducedMotion = useReducedMotion();
   const highlights = Array.isArray(highlight) ? highlight : [highlight];
 
   const parts: { text: string; isHighlighted: boolean }[] = [];
@@ -65,10 +67,12 @@ export function TextHighlight({
               className="absolute inset-0 -mx-1 -my-0.5 rounded-sm"
               style={{ backgroundColor: highlightColor, opacity: 0.2 }}
               variants={{
-                hidden: { scaleX: 0, originX: 0 },
+                hidden: { scaleX: prefersReducedMotion ? 1 : 0, originX: 0 },
                 visible: {
                   scaleX: 1,
-                  transition: { duration, ease: [0.22, 1, 0.36, 1] },
+                  transition: prefersReducedMotion
+                    ? { duration: 0 }
+                    : { duration, ease: [0.22, 1, 0.36, 1] },
                 },
               }}
             />

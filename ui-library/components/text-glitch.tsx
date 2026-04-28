@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import { motion, useInView } from "motion/react";
 import { cn } from "@uilibrary/utils";
+import { useReducedMotion } from "@uilibrary/hooks/use-reduced-motion";
 
 export interface TextGlitchProps {
   children: string;
@@ -19,10 +20,22 @@ export function TextGlitch({
   trigger = "hover",
   className,
 }: TextGlitchProps) {
+  const prefersReducedMotion = useReducedMotion();
   const ref = useRef<HTMLElement>(null);
   const isInView = useInView(ref, { once: true, margin: "-10%" });
 
   const shouldAnimate = trigger === "inView" ? isInView : false;
+
+  if (prefersReducedMotion) {
+    return (
+      <Tag
+        ref={ref as any}
+        className={cn("relative inline-block group", className)}
+      >
+        <span className="relative z-10">{children}</span>
+      </Tag>
+    );
+  }
 
   return (
     <Tag

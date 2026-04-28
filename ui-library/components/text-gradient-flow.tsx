@@ -2,6 +2,7 @@
 
 import { motion } from "motion/react";
 import { cn } from "@uilibrary/utils";
+import { useReducedMotion } from "@uilibrary/hooks/use-reduced-motion";
 
 export interface TextGradientFlowProps {
   children: string;
@@ -16,14 +17,15 @@ export function TextGradientFlow({
   as: Tag = "h2",
   colors = [
     "var(--color-accent)",
-    "#a855f7",
-    "#ec4899",
-    "#3b82f6",
+    "var(--color-brand-400)",
+    "var(--color-brand-300)",
+    "var(--color-brand-500)",
     "var(--color-accent)",
   ],
   duration = 5,
   className,
 }: TextGradientFlowProps) {
+  const prefersReducedMotion = useReducedMotion();
   const gradient = `linear-gradient(90deg, ${colors.join(", ")})`;
 
   return (
@@ -32,16 +34,18 @@ export function TextGradientFlow({
         className="bg-clip-text text-transparent inline-block"
         style={{
           backgroundImage: gradient,
-          backgroundSize: "300% 100%",
+          backgroundSize: prefersReducedMotion ? "100% 100%" : "300% 100%",
         }}
-        animate={{
-          backgroundPosition: ["0% center", "100% center", "0% center"],
-        }}
-        transition={{
-          duration,
-          repeat: Infinity,
-          ease: "linear",
-        }}
+        animate={
+          prefersReducedMotion
+            ? {}
+            : { backgroundPosition: ["0% center", "100% center", "0% center"] }
+        }
+        transition={
+          prefersReducedMotion
+            ? { duration: 0 }
+            : { duration, repeat: Infinity, ease: "linear" }
+        }
       >
         {children}
       </motion.span>

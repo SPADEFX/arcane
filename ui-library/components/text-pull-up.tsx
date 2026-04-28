@@ -2,6 +2,7 @@
 
 import { motion } from "motion/react";
 import { cn } from "@uilibrary/utils";
+import { useReducedMotion } from "@uilibrary/hooks/use-reduced-motion";
 
 export interface TextPullUpProps {
   children: string;
@@ -18,18 +19,21 @@ export function TextPullUp({
   staggerDelay = 0.05,
   className,
 }: TextPullUpProps) {
+  const prefersReducedMotion = useReducedMotion();
   const units = by === "word" ? children.split(" ") : children.split("");
 
   return (
     <Tag className={cn(className)}>
       <motion.span
         className="inline"
-        initial="hidden"
+        initial={prefersReducedMotion ? "visible" : "hidden"}
         whileInView="visible"
         viewport={{ once: true, margin: "-10%" }}
         variants={{
           hidden: {},
-          visible: { transition: { staggerChildren: staggerDelay } },
+          visible: {
+            transition: { staggerChildren: prefersReducedMotion ? 0 : staggerDelay },
+          },
         }}
       >
         {units.map((unit, i) => (
@@ -37,14 +41,12 @@ export function TextPullUp({
             <motion.span
               className="inline-block"
               variants={{
-                hidden: { y: "100%" },
+                hidden: { y: prefersReducedMotion ? "0%" : "100%" },
                 visible: {
                   y: "0%",
-                  transition: {
-                    type: "spring",
-                    stiffness: 300,
-                    damping: 30,
-                  },
+                  transition: prefersReducedMotion
+                    ? { duration: 0 }
+                    : { type: "spring", stiffness: 300, damping: 30 },
                 },
               }}
             >
