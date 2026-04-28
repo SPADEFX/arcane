@@ -14,6 +14,14 @@ const preview: Preview = {
     },
     layout: "centered",
   },
+  decorators: [
+    (Story) => {
+      // Force dark mode tokens on the document
+      document.documentElement.classList.add("dark");
+      document.documentElement.setAttribute("data-theme", "dark");
+      return Story();
+    },
+  ],
 };
 
 export default preview;
