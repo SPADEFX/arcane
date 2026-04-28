@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { SiteTheme } from "@uilibrary/ui";
 import { useSiteStore } from "../builder-stores/site-store";
 import { BlockRenderer } from "../builder-components/block-renderer";
+import { loadExtractedBlocks } from "../builder-registry/blocks";
 import "../builder-globals.css";
 
 export function Preview() {
@@ -12,6 +13,7 @@ export function Preview() {
 
   useEffect(() => {
     document.title = site ? `Preview — ${site.name}` : "Preview";
+    loadExtractedBlocks();
   }, [site]);
 
   if (!site) {
