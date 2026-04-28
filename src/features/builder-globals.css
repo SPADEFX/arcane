@@ -1,0 +1,197 @@
+/* Builder-specific styles (Tailwind + tokens imported globally in main.tsx) */
+
+body {
+  margin: 0;
+  background: #111113;
+  color: #fafafa;
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Better text wrapping - avoid orphaned words */
+h1, h2, h3, h4, h5, h6, p {
+  text-wrap: balance;
+}
+
+/* Tabular numbers for consistent digit width (prevents layout shift) */
+.tabular-nums,
+[data-tabular] {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Thin scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Input and select reset - minimal, let inline styles handle sizing */
+input,
+select,
+textarea {
+  font-family: inherit !important;
+  line-height: inherit !important;
+}
+
+/* Select dropdown styling */
+select option {
+  background: #1e1e22;
+  color: #fafafa;
+}
+
+/*
+ * Force desktop layout: override responsive breakpoints
+ * so components always render their md+ (desktop) state.
+ * Used in both canvas and preview.
+ */
+.force-desktop .md\:hidden {
+  display: none !important;
+}
+.force-desktop .hidden.md\:flex {
+  display: flex !important;
+}
+.force-desktop .hidden.md\:block {
+  display: block !important;
+}
+
+/* Force desktop for custom navbar classes */
+.force-desktop .nav-desktop-menu {
+  display: flex !important;
+}
+.force-desktop .nav-desktop-cta {
+  display: inline-flex !important;
+}
+.force-desktop .nav-mobile-button {
+  display: none !important;
+}
+.force-desktop .nav-mobile-menu {
+  display: none !important;
+}
+
+/* Force mobile for phone/tablet breakpoints */
+.breakpoint-phone .nav-desktop-menu,
+.breakpoint-tablet .nav-desktop-menu {
+  display: none !important;
+}
+.breakpoint-phone .nav-desktop-cta,
+.breakpoint-tablet .nav-desktop-cta {
+  display: none !important;
+}
+.breakpoint-phone .nav-mobile-button,
+.breakpoint-tablet .nav-mobile-button {
+  display: flex !important;
+}
+.breakpoint-phone .nav-mobile-menu,
+.breakpoint-tablet .nav-mobile-menu {
+  display: block !important;
+}
+
+/* Canvas only: also neutralize position:fixed so navbars flow in-place */
+.canvas-isolate .fixed,
+.canvas-isolate [style*="position: fixed"] {
+  position: relative !important;
+}
+
+/* ──────────────────────────────────────────────────────────
+   UI Polish - Make Interfaces Feel Better
+   ────────────────────────────────────────────────────────── */
+
+/* Shadows instead of borders - three-layer composition for depth */
+.shadow-border {
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 1px 2px rgba(0, 0, 0, 0.1),
+    0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.shadow-border-hover {
+  transition: box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.shadow-border-hover:hover {
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 2px 4px rgba(0, 0, 0, 0.12),
+    0 4px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* Image outlines for subtle depth */
+img {
+  outline: 1px solid rgba(0, 0, 0, 0.1);
+  outline-offset: -1px;
+}
+
+/* Smooth, interruptible transitions for interactive elements */
+button, a, [role="button"] {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Icon animation base */
+.icon-animated {
+  transition:
+    opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    filter 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.icon-animated:hover {
+  opacity: 0.8;
+  transform: scale(1.05);
+}
+
+/* Staggered entrance animations */
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.stagger-item {
+  animation: slideInUp 0.4s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+.stagger-item:nth-child(1) { animation-delay: 0ms; }
+.stagger-item:nth-child(2) { animation-delay: 80ms; }
+.stagger-item:nth-child(3) { animation-delay: 160ms; }
+.stagger-item:nth-child(4) { animation-delay: 240ms; }
+.stagger-item:nth-child(5) { animation-delay: 320ms; }
+.stagger-item:nth-child(6) { animation-delay: 400ms; }
+.stagger-item:nth-child(7) { animation-delay: 480ms; }
+.stagger-item:nth-child(8) { animation-delay: 560ms; }
+
+/* Subtle exit animation - less movement than entrance */
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
+.exit-fade {
+  animation: fadeOut 0.2s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+/* Concentric border radius helper */
+.nested-radius-outer { border-radius: calc(var(--inner-radius, 8px) + var(--padding, 16px)); }
+.nested-radius-inner { border-radius: var(--inner-radius, 8px); }

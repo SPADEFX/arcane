@@ -8,6 +8,9 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "src"),
+      "@uilibrary/ui/components": path.resolve(__dirname, "ui-library/components"),
+      "@uilibrary/ui/sections": path.resolve(__dirname, "ui-library/sections"),
+      "@uilibrary/ui": path.resolve(__dirname, "ui-library/index.ts"),
       "@uilibrary": path.resolve(__dirname, "ui-library"),
     },
   },

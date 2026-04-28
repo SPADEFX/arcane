@@ -1,4 +1,4 @@
-// Start all services for Studio
+// Start all services for Arcane
 const { spawn } = require("child_process");
 const path = require("path");
 
@@ -23,9 +23,15 @@ const services = [
     args: ["vite", "--port", "3333"],
     cwd: __dirname,
   },
+  {
+    name: "Storybook",
+    cmd: "npx",
+    args: ["storybook", "dev", "-p", "6006", "--no-open"],
+    cwd: __dirname,
+  },
 ];
 
-console.log("\n  Studio — Starting all services...\n");
+console.log("\n  Arcane — Starting all services...\n");
 
 for (const svc of services) {
   const child = spawn(svc.cmd, svc.args, {
@@ -58,5 +64,6 @@ console.log(`
   Services:
     Extract Tool API  → http://localhost:3000
     Medal Forge       → http://localhost:3001
-    Studio            → http://localhost:3333  ← OUVRE CELUI-CI
+    Studio            → http://localhost:3333
+    Storybook         → http://localhost:6006  ← LIBRARY
 `);

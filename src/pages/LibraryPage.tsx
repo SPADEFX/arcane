@@ -1,7 +1,8 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useComponentStore } from "@/stores/component-store";
 import { bootstrapRegistry } from "@/lib/bootstrap";
-import type { ComponentCategory } from "@/types/component-registry";
+import { DynamicRenderer } from "@/components/DynamicRenderer";
+import type { ComponentCategory, ComponentDefinition } from "@/types/component-registry";
 
 const CATEGORIES: { value: ComponentCategory | "all"; label: string }[] = [
   { value: "all", label: "Tous" },
@@ -65,28 +66,45 @@ export function LibraryPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {components.map((comp) => (
-              <div
-                key={comp.id}
-                className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 cursor-pointer hover:border-zinc-600 transition-all hover:-translate-y-0.5 group"
-                onClick={() => alert(`Component: ${comp.name}\nPath: ${comp.source.type === "builtin" ? comp.source.path : "custom"}`)}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-semibold text-zinc-100 group-hover:text-white">{comp.name}</h3>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400 font-medium">{comp.category}</span>
-                </div>
-                <p className="text-xs text-zinc-500 leading-relaxed mb-3">{comp.description}</p>
-                <div className="flex flex-wrap gap-1">
-                  {comp.tags.slice(0, 4).map((tag) => (
-                    <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800/50 text-zinc-500">{tag}</span>
-                  ))}
-                </div>
-                {comp.isSection && (
-                  <div className="mt-2 text-[10px] text-blue-400 font-medium">Section</div>
-                )}
-              </div>
+              <ComponentCard key={comp.id} comp={comp} />
             ))}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function ComponentCard({ comp }: { comp: ComponentDefinition }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden cursor-pointer hover:border-zinc-600 transition-all hover:-translate-y-0.5 group">
+      {/* Preview area */}
+      <div
+        className="relative bg-zinc-950 border-b border-zinc-800 overflow-hidden"
+        style={{ height: expanded ? "auto" : "160px", minHeight: expanded ? "200px" : undefined }}
+        onClick={() => setExpanded(!expanded)}
+      >
+        <div className={`${expanded ? "" : "scale-[0.5] origin-top-left"}`} style={expanded ? {} : { width: "200%", height: "200%" }}>
+          <DynamicRenderer slug={comp.slug} componentProps={comp.defaultProps} />
+        </div>
+        {!expanded && (
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-zinc-900/80 pointer-events-none" />
+        )}
+      </div>
+      {/* Info */}
+      <div className="p-4">
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="text-sm font-semibold text-zinc-100 group-hover:text-white">{comp.name}</h3>
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400 font-medium">{comp.category}</span>
+        </div>
+        <p className="text-xs text-zinc-500 leading-relaxed mb-2">{comp.description}</p>
+        <div className="flex flex-wrap gap-1">
+          {comp.tags.slice(0, 4).map((tag) => (
+            <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800/50 text-zinc-500">{tag}</span>
+          ))}
+        </div>
       </div>
     </div>
   );
