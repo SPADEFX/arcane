@@ -224,9 +224,23 @@ module.exports = async function surgicalExtract(rootSelector, rootTreePath) {
     }
   }
 
+  // Collect external stylesheet URLs for @import fallback
+  const externalStylesheets = [];
   for (const sheet of Array.from(document.styleSheets)) {
-    try { walkRules(sheet.cssRules); } catch(e) { /* cross-origin */ }
+    try {
+      walkRules(sheet.cssRules);
+    } catch(e) {
+      // Cross-origin — can't read rules, save the URL for @import
+      if (sheet.href) externalStylesheets.push(sheet.href);
+    }
   }
+  // Also collect <link rel="stylesheet"> URLs
+  document.querySelectorAll('link[rel="stylesheet"]').forEach(function(link) {
+    var href = link.href;
+    if (href && externalStylesheets.indexOf(href) === -1) {
+      externalStylesheets.push(href);
+    }
+  });
 
   // Also scan raw <style> tags we couldn't read via CSSOM
   for (const styleEl of document.querySelectorAll("style")) {
@@ -366,6 +380,11 @@ module.exports = async function surgicalExtract(rootSelector, rootTreePath) {
 
   // ── Build scoped CSS string ────────────────────────────────────────
   let scopedCss = "";
+  // Include external stylesheets via @import — these load from the
+  // original CDN (cached by browser), ensuring ALL CSS is available
+  for (const url of externalStylesheets) {
+    scopedCss += '@import url("' + url + '");\n';
+  }
   // CSS variables
   if (Object.keys(cssVars).length > 0) {
     scopedCss += ":root {\n";
@@ -444,9 +463,11 @@ module.exports = async function surgicalExtract(rootSelector, rootTreePath) {
     wapiAnimations,
     transitions,
     dimensions,
+    externalStylesheets,
     stats: {
       elements: sectionEls.size,
       cssRules: matchedRules.length,
+      externalSheets: externalStylesheets.length,
       keyframeNames: Object.keys(keyframes).length,
       cssVarCount: Object.keys(cssVars).length,
       fontCount: fonts.length,
