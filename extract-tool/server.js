@@ -29,6 +29,25 @@ function getBrowser() {
   return browserPromise;
 }
 
+// Shared browser-side function: resolve a DOM element from selector or tree path.
+// Used in page.evaluateHandle / page.evaluate across multiple handlers.
+function resolveElement(sel, tp, nthPath) {
+  let el = null;
+  if (sel) try { el = document.querySelector(sel); } catch(e) {}
+  if (!el && nthPath) try { el = document.querySelector(nthPath); } catch(e) {}
+  if (!el && tp) {
+    const parts = tp.split(".").map(Number);
+    el = document.body;
+    const skip = {script:1,noscript:1,style:1,link:1,meta:1,base:1,template:1};
+    for (let i = 1; i < parts.length && el; i++) {
+      const filtered = Array.from(el.children).filter(c => !skip[c.tagName.toLowerCase()]);
+      el = filtered[parts[i]] || null;
+    }
+  }
+  return el;
+}
+
+
 // ── Progress tracking ───────────────────────────────────────────────────
 // Simple in-memory state polled by GET /api/progress.
 const progressState = { step: "", pct: 0, detail: "", active: false };
@@ -478,20 +497,7 @@ async function handleSurgicalExtract(req, res) {
         // Take screenshot of the element
         let screenshot = "";
         try {
-          const elHandle = await page.evaluateHandle((sel, tp) => {
-            let el = null;
-            if (sel) try { el = document.querySelector(sel); } catch(e) {}
-            if (!el && tp) {
-              const parts = tp.split(".").map(Number);
-              el = document.body;
-              const skip = {script:1,noscript:1,style:1,link:1,meta:1,base:1,template:1};
-              for (let i = 1; i < parts.length && el; i++) {
-                const filtered = Array.from(el.children).filter(c => !skip[c.tagName.toLowerCase()]);
-                el = filtered[parts[i]] || null;
-              }
-            }
-            return el;
-          }, selector || null, treePath || null);
+          const elHandle = await page.evaluateHandle(resolveElement, selector || null, treePath || null);
           if (elHandle) {
             screenshot = await elHandle.screenshot({ type: "png", encoding: "base64" }).catch(() => "");
           }
@@ -541,26 +547,22 @@ async function handleExtractToComponent(req, res) {
         // Step 1b: Screenshot
         let screenshot = "";
         try {
-          const elHandle = await page.evaluateHandle((sel, tp) => {
-            let el = null;
-            if (sel) try { el = document.querySelector(sel); } catch(e) {}
-            if (!el && tp) {
-              const parts = tp.split(".").map(Number);
-              el = document.body;
-              const skip = {script:1,noscript:1,style:1,link:1,meta:1,base:1,template:1};
-              for (let i = 1; i < parts.length && el; i++) {
-                const filtered = Array.from(el.children).filter(c => !skip[c.tagName.toLowerCase()]);
-                el = filtered[parts[i]] || null;
-              }
-            }
-            return el;
-          }, selector || null, treePath || null);
+          const elHandle = await page.evaluateHandle(resolveElement, selector || null, treePath || null);
           if (elHandle) screenshot = await elHandle.screenshot({ type: "png", encoding: "base64" }).catch(() => "");
         } catch(e) {}
 
         // Step 2: Generate component
         const componentName = name || "ExtractedSection";
         const generated = generateComponent(extraction, componentName);
+
+        // Optional: AI-powered cleanup if API key is available
+        let aiCleanedHtml = null;
+        if (getApiKey() && extraction.html) {
+          try {
+            const { cleanupExtractedCode } = require("./lib/ai");
+            aiCleanedHtml = await cleanupExtractedCode(extraction.html, extraction.scopedCss);
+          } catch(e) {}
+        }
 
         sendJson(res, 200, {
           ok: true,
@@ -580,6 +582,7 @@ async function handleExtractToComponent(req, res) {
             props: generated.props,
             defaultProps: generated.defaultProps,
           },
+          aiCleanedHtml,
           screenshot: screenshot ? "data:image/png;base64," + screenshot : null,
         });
       } finally {
@@ -712,22 +715,7 @@ async function handleCloneSection(req, res) {
         // Take a pixel-perfect screenshot of the section using Puppeteer
         let screenshotB64 = "";
         try {
-          // Find the element handle for screenshot
-          const elHandle = await page.evaluateHandle((opts) => {
-            var el = null;
-            if (opts.selector) try { el = document.querySelector(opts.selector); } catch(e) {}
-            if (!el && opts.nthPath) try { el = document.querySelector(opts.nthPath); } catch(e) {}
-            if (!el && opts.treePath) {
-              var parts = opts.treePath.split(".").map(Number);
-              el = document.body;
-              var skip = {script:1,noscript:1,style:1,link:1,meta:1,base:1,template:1};
-              for (var i = 1; i < parts.length && el; i++) {
-                var filtered = Array.from(el.children).filter(function(c) { return !skip[c.tagName.toLowerCase()]; });
-                el = filtered[parts[i]] || null;
-              }
-            }
-            return el;
-          }, { selector, nthPath, treePath });
+          const elHandle = await page.evaluateHandle(resolveElement, selector || null, treePath || null, nthPath || null);
           if (elHandle) {
             const screenshot = await elHandle.screenshot({ type: "png", encoding: "base64" });
             screenshotB64 = screenshot;
@@ -925,6 +913,30 @@ export const Default: Story = {};
   });
 }
 
+async function handleExportSite(req, res) {
+  let body = "";
+  req.on("data", (c) => { body += c; });
+  req.on("end", () => {
+    try {
+      const { blocks, theme, meta, format } = JSON.parse(body);
+      if (format === "html") {
+        let html = `<!doctype html>\n<html>\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1">\n<title>${(meta && meta.title) || "Exported Site"}</title>\n<style>\n* { box-sizing: border-box; margin: 0; padding: 0; }\nbody { font-family: ${(theme && theme.font) || "Inter"}, system-ui, sans-serif; background: ${(theme && theme.dark) ? "#09090b" : "#fff"}; color: ${(theme && theme.dark) ? "#fafafa" : "#09090b"}; }\n</style>\n</head>\n<body>\n`;
+        for (const block of (blocks || [])) {
+          if (block.rawHtml) {
+            html += `<style>${block.css || ""}</style>\n${block.rawHtml}\n`;
+          }
+        }
+        html += `</body>\n</html>`;
+        sendJson(res, 200, { ok: true, html, format: "html" });
+      } else {
+        sendJson(res, 400, { error: "Unsupported format: " + format });
+      }
+    } catch(e) {
+      sendJson(res, 500, { error: String(e.message || e) });
+    }
+  });
+}
+
 const server = http.createServer((req, res) => {
   if (req.method === "POST" && req.url === "/api/extract") return handleExtract(req, res);
   if (req.method === "POST" && req.url === "/api/record") return handleRecord(req, res);
@@ -938,6 +950,7 @@ const server = http.createServer((req, res) => {
   if (req.method === "POST" && req.url === "/api/surgical-extract") return handleSurgicalExtract(req, res);
   if (req.method === "POST" && req.url === "/api/extract-to-component") return handleExtractToComponent(req, res);
   if (req.method === "POST" && req.url === "/api/save-to-library") return handleSaveToLibrary(req, res);
+  if (req.method === "POST" && req.url === "/api/export-site") return handleExportSite(req, res);
   if (req.method === "GET" && req.url === "/api/progress") return handleProgress(req, res);
   if (req.method === "GET" && req.url.startsWith("/api/clone-files")) return handleCloneFiles(req, res);
   if (req.method === "GET") return serveStatic(req, res);

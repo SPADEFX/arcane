@@ -1,3 +1,4 @@
+import { useRef, useState, useEffect, useCallback } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { SiteTheme } from "@uilibrary/ui";
@@ -24,10 +25,32 @@ export function Canvas({ siteId }: CanvasProps) {
   const canvasWidth = breakpointWidths[breakpoint];
   const isConstrained = breakpoint !== "desktop";
 
-  console.log("Canvas breakpoint:", breakpoint, "force-desktop:", breakpoint === "desktop");
+  // Measure available width to compute scale factor for constrained previews
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [availableWidth, setAvailableWidth] = useState(0);
+
+  const measureWidth = useCallback(() => {
+    if (containerRef.current) {
+      setAvailableWidth(containerRef.current.clientWidth);
+    }
+  }, []);
+
+  useEffect(() => {
+    measureWidth();
+    window.addEventListener("resize", measureWidth);
+    return () => window.removeEventListener("resize", measureWidth);
+  }, [measureWidth]);
+
+  // Scale factor: fit the breakpoint width inside the available container space
+  // Leave some padding (48px total) for the rounded border appearance
+  const padding = 48;
+  const scale = isConstrained && availableWidth > 0
+    ? Math.min(1, (availableWidth - padding) / canvasWidth)
+    : 1;
 
   return (
     <div
+      ref={containerRef}
       className="flex-1 overflow-y-auto overflow-x-hidden bg-[#111113]"
       onClick={() => setSelectedBlockId(null)}
     >
@@ -35,7 +58,12 @@ export function Canvas({ siteId }: CanvasProps) {
         className={`${breakpoint === "desktop" ? "force-desktop" : ""} breakpoint-${breakpoint} canvas-isolate relative mx-auto min-h-full overflow-hidden transition-all duration-300 ${
           isConstrained ? "my-6 rounded-xl shadow-2xl border border-white/[0.04]" : ""
         }`}
-        style={{ maxWidth: canvasWidth }}
+        style={{
+          width: isConstrained ? canvasWidth : undefined,
+          maxWidth: isConstrained ? undefined : canvasWidth,
+          transform: isConstrained ? `scale(${scale})` : undefined,
+          transformOrigin: "top center",
+        }}
       >
         <SiteTheme
           font={site?.theme.font}

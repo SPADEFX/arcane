@@ -113,4 +113,19 @@ Rules:
   return callClaude(system, `Create this section: ${prompt}`, 16384);
 }
 
-module.exports = { callClaude, convertCode, generateSection, getApiKey };
+async function cleanupExtractedCode(html, css, targetStyle = "tailwind") {
+  const system = `You are an expert frontend developer. Clean up the following extracted HTML and CSS:
+- Remove unnecessary wrapper divs
+- Simplify class names
+- Convert inline styles to classes
+- Add semantic HTML tags (section, article, nav, header, footer)
+- Make the code clean and readable
+- ${targetStyle === "tailwind" ? "Convert CSS to Tailwind utility classes where possible" : "Keep CSS but clean it up"}
+- Preserve the exact visual appearance
+Output ONLY the cleaned HTML. No explanations, no markdown.`;
+
+  const user = `HTML:\n${html.slice(0, 20000)}\n\nCSS:\n${css.slice(0, 15000)}`;
+  return callClaude(system, user, 16384);
+}
+
+module.exports = { callClaude, convertCode, generateSection, getApiKey, cleanupExtractedCode };

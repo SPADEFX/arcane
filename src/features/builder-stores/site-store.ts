@@ -4,8 +4,16 @@ import { nanoid } from "nanoid";
 import type { Site, Page, Block, ThemeConfig } from "../builder-registry/types";
 import type { PageTemplate } from "../builder-registry/templates";
 
+const MAX_HISTORY = 50;
+
 interface SiteStore {
   sites: Site[];
+
+  /* Undo / Redo */
+  history: Site[][];
+  historyIndex: number;
+  undo: () => void;
+  redo: () => void;
 
   /* Site CRUD */
   createSite: (name: string) => string;
@@ -46,10 +54,59 @@ function updatePage(site: Site, pageId: string, fn: (p: Page) => Page): Site {
   return touch({ ...site, pages: site.pages.map((p) => (p.id === pageId ? fn(p) : p)) });
 }
 
+/**
+ * History uses a timeline model:
+ *   history = [state0, state1, state2, ...]
+ *   historyIndex points to the "current" entry in the timeline.
+ *
+ * On mutation: trim entries after historyIndex, push current sites (pre-mutation),
+ *   then after the mutation the new sites become the implicit "head".
+ *   We actually push BOTH the pre-mutation and post-mutation state.
+ *
+ * undo(): decrement historyIndex, restore that entry.
+ * redo(): increment historyIndex, restore that entry.
+ */
+function saveAndMutate(
+  get: () => SiteStore,
+  set: (partial: Partial<SiteStore>) => void,
+  mutate: (sites: Site[]) => Site[],
+) {
+  const { sites, history, historyIndex } = get();
+  // Trim any redo entries
+  const trimmed = history.slice(0, historyIndex + 1);
+  // Push the current state (before mutation)
+  if (trimmed.length === 0) {
+    // First mutation: save the initial state too
+    trimmed.push(structuredClone(sites));
+  }
+  const newSites = mutate(sites);
+  // Push the new state (after mutation)
+  trimmed.push(structuredClone(newSites));
+  // Enforce max history size (remove oldest entries)
+  while (trimmed.length > MAX_HISTORY) trimmed.shift();
+  set({ sites: newSites, history: trimmed, historyIndex: trimmed.length - 1 });
+}
+
 export const useSiteStore = create<SiteStore>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       sites: [],
+      history: [],
+      historyIndex: -1,
+
+      undo: () => {
+        const { history, historyIndex } = get();
+        if (historyIndex <= 0) return;
+        const prev = historyIndex - 1;
+        set({ sites: structuredClone(history[prev]), historyIndex: prev });
+      },
+
+      redo: () => {
+        const { history, historyIndex } = get();
+        if (historyIndex >= history.length - 1) return;
+        const next = historyIndex + 1;
+        set({ sites: structuredClone(history[next]), historyIndex: next });
+      },
 
       createSite: (name) => {
         const id = nanoid(10);
@@ -157,8 +214,8 @@ export const useSiteStore = create<SiteStore>()(
       },
 
       addBlock: (siteId, pageId, block, index) => {
-        set((s) => ({
-          sites: updateSite(s.sites, siteId, (site) =>
+        saveAndMutate(get, set, (sites) =>
+          updateSite(sites, siteId, (site) =>
             updatePage(site, pageId, (p) => {
               const blocks = [...p.blocks];
               if (index !== undefined) {
@@ -169,23 +226,23 @@ export const useSiteStore = create<SiteStore>()(
               return { ...p, blocks };
             }),
           ),
-        }));
+        );
       },
 
       removeBlock: (siteId, pageId, blockId) => {
-        set((s) => ({
-          sites: updateSite(s.sites, siteId, (site) =>
+        saveAndMutate(get, set, (sites) =>
+          updateSite(sites, siteId, (site) =>
             updatePage(site, pageId, (p) => ({
               ...p,
               blocks: p.blocks.filter((b) => b.id !== blockId),
             })),
           ),
-        }));
+        );
       },
 
       duplicateBlock: (siteId, pageId, blockId) => {
-        set((s) => ({
-          sites: updateSite(s.sites, siteId, (site) =>
+        saveAndMutate(get, set, (sites) =>
+          updateSite(sites, siteId, (site) =>
             updatePage(site, pageId, (p) => {
               const idx = p.blocks.findIndex((b) => b.id === blockId);
               if (idx === -1) return p;
@@ -195,12 +252,12 @@ export const useSiteStore = create<SiteStore>()(
               return { ...p, blocks };
             }),
           ),
-        }));
+        );
       },
 
       moveBlock: (siteId, pageId, fromIndex, toIndex) => {
-        set((s) => ({
-          sites: updateSite(s.sites, siteId, (site) =>
+        saveAndMutate(get, set, (sites) =>
+          updateSite(sites, siteId, (site) =>
             updatePage(site, pageId, (p) => {
               const blocks = [...p.blocks];
               const [moved] = blocks.splice(fromIndex, 1);
@@ -208,12 +265,12 @@ export const useSiteStore = create<SiteStore>()(
               return { ...p, blocks };
             }),
           ),
-        }));
+        );
       },
 
       updateBlockProps: (siteId, pageId, blockId, props) => {
-        set((s) => ({
-          sites: updateSite(s.sites, siteId, (site) =>
+        saveAndMutate(get, set, (sites) =>
+          updateSite(sites, siteId, (site) =>
             updatePage(site, pageId, (p) => ({
               ...p,
               blocks: p.blocks.map((b) =>
@@ -221,9 +278,12 @@ export const useSiteStore = create<SiteStore>()(
               ),
             })),
           ),
-        }));
+        );
       },
     }),
-    { name: "uilibrary-builder-sites" },
+    {
+      name: "uilibrary-builder-sites",
+      partialize: (state) => ({ sites: state.sites }),
+    },
   ),
 );

@@ -1,7 +1,10 @@
 const DB_NAME = "arcane";
 const DB_VERSION = 1;
 
+let cachedDb: IDBDatabase | null = null;
+
 function open(): Promise<IDBDatabase> {
+  if (cachedDb) return Promise.resolve(cachedDb);
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = () => {
@@ -19,7 +22,7 @@ function open(): Promise<IDBDatabase> {
         store.createIndex("status", "status", { unique: false });
       }
     };
-    req.onsuccess = () => resolve(req.result);
+    req.onsuccess = () => { cachedDb = req.result; resolve(cachedDb); };
     req.onerror = () => reject(req.error);
   });
 }

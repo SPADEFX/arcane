@@ -254,6 +254,59 @@ module.exports = async function surgicalExtract(rootSelector, rootTreePath) {
     }
   }
 
+  // ── Phase 2b: Computed style safety net ────────────────────────────
+  // For each element in the section, check if any visual property has a
+  // computed value that differs from the browser default. If the CSS rule
+  // matching didn't capture a rule for that property, inject a fallback
+  // using a data-attribute selector. This fills gaps when CSS scoping
+  // misses a rule (e.g., inline styles, complex selectors, JS-applied).
+  var defaultEl = document.createElement("div");
+  document.body.appendChild(defaultEl);
+  var defaultCs = getComputedStyle(defaultEl);
+  var checkProps = ["display","flex-direction","grid-template-columns","grid-template-rows","gap","align-items","justify-content","padding","margin","font-size","font-weight","font-family","color","background-color","border-radius","max-width","text-align","line-height","letter-spacing","opacity","transform"];
+
+  var fallbackRules = [];
+  var fbIdx = 0;
+  for (var el of sectionEls) {
+    var cs = getComputedStyle(el);
+    var overrides = [];
+    for (var prop of checkProps) {
+      var val = cs.getPropertyValue(prop);
+      var def = defaultCs.getPropertyValue(prop);
+      if (val && val !== def) {
+        overrides.push(prop + ":" + val);
+      }
+    }
+    if (overrides.length > 0) {
+      var attr = "data-mx-fb-" + fbIdx;
+      el.setAttribute(attr, "");
+      fallbackRules.push({ selector: "[" + attr + "]", css: overrides.join(";") });
+      fbIdx++;
+    }
+  }
+  defaultEl.remove();
+
+  // Add fallback rules AFTER matched rules (lower priority)
+  for (var fr of fallbackRules) {
+    matchedRules.push(fr);
+  }
+
+  // ── Phase 2c: Inline cross-origin stylesheets ─────────────────────
+  // Try to fetch external stylesheets and inline their CSS content
+  // directly instead of relying on @import (which may fail cross-origin).
+  for (var i = 0; i < externalStylesheets.length; i++) {
+    try {
+      var resp = await fetch(externalStylesheets[i]);
+      if (resp.ok) {
+        var text = await resp.text();
+        // Push as raw CSS instead of @import
+        matchedRules.push({ type: "raw", css: "/* inlined: " + externalStylesheets[i].split("/").pop() + " */\n" + text });
+        externalStylesheets.splice(i, 1);
+        i--;
+      }
+    } catch(e) {}
+  }
+
   // ── Phase 3: Resolve CSS variables chain ───────────────────────────
   const cssVars = {};
   const rootStyle = getComputedStyle(document.documentElement);
@@ -388,7 +441,7 @@ module.exports = async function surgicalExtract(rootSelector, rootTreePath) {
   scopedCss += ':host { background: ' + bgColor + '; display: block; }\n';
   // CSS variables
   if (Object.keys(cssVars).length > 0) {
-    scopedCss += ":root {\n";
+    scopedCss += ":host {\n";
     for (const [k, v] of Object.entries(cssVars)) {
       scopedCss += "  " + k + ": " + v + ";\n";
     }

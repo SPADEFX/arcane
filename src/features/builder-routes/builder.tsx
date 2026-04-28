@@ -34,6 +34,23 @@ export function Builder() {
     loadExtractedBlocks().then(() => setBlocksReady(true));
   }, []);
 
+  // Undo / Redo keyboard shortcuts
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      const ctrl = e.ctrlKey || e.metaKey;
+      if (!ctrl) return;
+      if (e.key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        useSiteStore.getState().undo();
+      } else if ((e.key === "z" && e.shiftKey) || e.key === "y") {
+        e.preventDefault();
+        useSiteStore.getState().redo();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   // Initialize active page
   useEffect(() => {
     if (site && !activePageId) {

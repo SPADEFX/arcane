@@ -46,7 +46,6 @@ export default function App() {
       if (e.data?.type === "arcane-save-component" && e.data.component) {
         try {
           await db.put("components", e.data.component);
-          console.log("✅ Component saved to library:", e.data.component.name);
           // Reload extracted blocks in builder registry
           import("./features/builder-registry/blocks").then(m => m.loadExtractedBlocks());
         } catch (err) {
