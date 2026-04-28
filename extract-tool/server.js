@@ -8,6 +8,7 @@ const { convertCode, generateSection, getApiKey } = require("./lib/ai");
 const { convert: convertLocal } = require("./lib/convert-local");
 const siteAnalysis = require("./lib/analyze");
 const surgicalExtract = require("./lib/surgical-extract");
+const { generateComponent } = require("./lib/codegen");
 
 const PORT = Number(process.env.PORT) || 3000;
 const PUBLIC = path.join(__dirname, "public");
@@ -510,6 +511,86 @@ async function handleSurgicalExtract(req, res) {
   });
 }
 
+async function handleExtractToComponent(req, res) {
+  let body = "";
+  req.on("data", (c) => { body += c; if (body.length > 5e5) req.destroy(); });
+  req.on("end", async () => {
+    try {
+      const { url, selector, nthPath, path: treePath, name } = JSON.parse(body);
+      if (!url) return sendJson(res, 400, { error: "missing url" });
+
+      const browser = await getBrowser();
+      const page = await browser.newPage();
+      try {
+        await page.setViewport({ width: 1440, height: 900 });
+        await page.evaluateOnNewDocument(() => {
+          var orig = HTMLCanvasElement.prototype.getContext;
+          HTMLCanvasElement.prototype.getContext = function(type, attrs) {
+            if (type === "webgl" || type === "webgl2" || type === "experimental-webgl")
+              attrs = Object.assign({}, attrs || {}, { preserveDrawingBuffer: true });
+            return orig.call(this, type, attrs);
+          };
+        });
+        await page.goto(url, { waitUntil: ["domcontentloaded", "networkidle2"], timeout: 30000 });
+        await new Promise((r) => setTimeout(r, 3000));
+
+        // Step 1: Surgical extraction
+        const extraction = await page.evaluate(surgicalExtract, selector || null, treePath || null);
+        if (extraction.error) return sendJson(res, 400, { error: extraction.error });
+
+        // Step 1b: Screenshot
+        let screenshot = "";
+        try {
+          const elHandle = await page.evaluateHandle((sel, tp) => {
+            let el = null;
+            if (sel) try { el = document.querySelector(sel); } catch(e) {}
+            if (!el && tp) {
+              const parts = tp.split(".").map(Number);
+              el = document.body;
+              const skip = {script:1,noscript:1,style:1,link:1,meta:1,base:1,template:1};
+              for (let i = 1; i < parts.length && el; i++) {
+                const filtered = Array.from(el.children).filter(c => !skip[c.tagName.toLowerCase()]);
+                el = filtered[parts[i]] || null;
+              }
+            }
+            return el;
+          }, selector || null, treePath || null);
+          if (elHandle) screenshot = await elHandle.screenshot({ type: "png", encoding: "base64" }).catch(() => "");
+        } catch(e) {}
+
+        // Step 2: Generate component
+        const componentName = name || "ExtractedSection";
+        const generated = generateComponent(extraction, componentName);
+
+        sendJson(res, 200, {
+          ok: true,
+          // Extraction data
+          extraction: {
+            html: extraction.html,
+            scopedCss: extraction.scopedCss,
+            stats: extraction.stats,
+            cssVars: extraction.cssVars,
+            images: extraction.images,
+            wapiAnimations: extraction.wapiAnimations,
+          },
+          // Generated component
+          component: {
+            tsx: generated.tsx,
+            css: generated.css,
+            props: generated.props,
+            defaultProps: generated.defaultProps,
+          },
+          screenshot: screenshot ? "data:image/png;base64," + screenshot : null,
+        });
+      } finally {
+        await page.close().catch(() => {});
+      }
+    } catch (e) {
+      sendJson(res, 500, { error: String(e.message || e) });
+    }
+  });
+}
+
 async function handleCloneSection(req, res) {
   let body = "";
   req.on("data", (c) => { body += c; if (body.length > 1e5) req.destroy(); });
@@ -738,6 +819,7 @@ const server = http.createServer((req, res) => {
   if (req.method === "POST" && req.url === "/api/analyze-site") return handleAnalyzeSite(req, res);
   if (req.method === "POST" && req.url === "/api/clone-section") return handleCloneSection(req, res);
   if (req.method === "POST" && req.url === "/api/surgical-extract") return handleSurgicalExtract(req, res);
+  if (req.method === "POST" && req.url === "/api/extract-to-component") return handleExtractToComponent(req, res);
   if (req.method === "GET" && req.url === "/api/progress") return handleProgress(req, res);
   if (req.method === "GET" && req.url.startsWith("/api/clone-files")) return handleCloneFiles(req, res);
   if (req.method === "GET") return serveStatic(req, res);
