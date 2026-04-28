@@ -8,7 +8,7 @@ function ExtractedSectionPreview() {
         if (!el) return;
         let shadow = el.shadowRoot;
         if (!shadow) shadow = el.attachShadow({ mode: "open" });
-        shadow.innerHTML = `<style>:root {
+        shadow.innerHTML = `<style>:host {
   --text: 252, 252, 252;
   --primary: 151, 171, 255;
   --font-sm: 12px;
@@ -17,7 +17,7 @@ function ExtractedSectionPreview() {
   --background: 16, 17, 20;
 }
 
-@font-face { src: url("/fonts/aeonik.woff2") format("woff2"); font-family: Aeonik; font-display: swap; }
+@font-face { src: url("https://app.proxima.tools/fonts/aeonik.woff2") format("woff2"); font-family: Aeonik; font-display: swap; }
 
 ._button_1o1ro_1 { display:flex;justify-content:center;align-items:center;row-gap:6px;column-gap:6px;transition-behavior:normal;transition-duration:0.2s;transition-timing-function:cubic-bezier(0.34, 1.56, 0.64, 1);transition-delay:0s;transition-property:all;cursor:pointer;border-top-left-radius:0px;border-top-right-radius:0px;border-bottom-right-radius:0px;border-bottom-left-radius:0px;padding-top:8px;padding-right:16px;padding-bottom:8px;padding-left:16px;width:fit-content;color:rgb(var(--text));--corner:8px;--b:1px;--offset:0px;position:relative }
 ._button_1o1ro_1:hover { --offset:4px }
@@ -59,7 +59,7 @@ function ExtractedSectionPreview() {
 button { cursor:pointer;border-top-width:initial;border-right-width:initial;border-bottom-width:initial;border-left-width:initial;border-top-style:none;border-right-style:none;border-bottom-style:none;border-left-style:none;border-top-color:initial;border-right-color:initial;border-bottom-color:initial;border-left-color:initial;border-image-source:initial;border-image-slice:initial;border-image-width:initial;border-image-outset:initial;border-image-repeat:initial;color:rgb(var(--background));font-weight:500;font-size:var(--font-sm) }
 input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { appearance:none;margin-top:0px;margin-right:0px;margin-bottom:0px;margin-left:0px }
 input:focus { outline-color:initial;outline-style:none;outline-width:initial }
-</style><div class="_main_1dul3_20"><h1>Welcome to Proxima,<br><span>Enter your access key to start.</span></h1><img alt="Proxima" loading="lazy" src="/opengraph-image.png"><form><div class="undefined _main_zm5pn_1 "><div class="_container_zm5pn_12  "><input id="api_key" placeholder="Access Key" type="text" value=""></div></div><button class=" _button_1o1ro_1 _tertiary_1o1ro_134 _large_1o1ro_172 " type="submit" style="width: 100%; margin-top: 24px;">Enter</button></form></div>`;
+</style><div class="_main_1dul3_20"><h1>Welcome to Proxima,<br><span>Enter your access key to start.</span></h1><img alt="Proxima" loading="lazy" src="https://app.proxima.tools/opengraph-image.png"><form><div class="undefined _main_zm5pn_1 "><div class="_container_zm5pn_12  "><input id="api_key" placeholder="Access Key" type="text" value=""></div></div><button class=" _button_1o1ro_1 _tertiary_1o1ro_134 _large_1o1ro_172 " type="submit" style="width: 100%; margin-top: 24px;">Enter</button></form></div>`;
       }}
       style={{ width: "100%" }}
     />

@@ -177,11 +177,8 @@ const INSPECT_SCRIPT = `<script>
         // Visibility check
         var r = node.getBoundingClientRect();
         var cs = getComputedStyle(node);
-        var hidden = (r.width === 0 && r.height === 0) ||
-          cs.display === "none" ||
-          cs.visibility === "hidden" ||
-          cs.opacity === "0" ||
-          (r.bottom < 0 || r.right < 0 || r.top > window.innerHeight + 500 || r.left > window.innerWidth + 500);
+        var hidden = (r.width === 0 && r.height === 0 && node.children.length === 0) ||
+          cs.display === "none";
         // Analyze content to detect semantic role
         var text = (node.textContent || "").trim().slice(0, 80).replace(/\s+/g, " ");
         var innerTags = {};

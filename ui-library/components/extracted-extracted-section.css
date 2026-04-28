@@ -1,4 +1,4 @@
-:root {
+:host {
   --text: 252, 252, 252;
   --primary: 151, 171, 255;
   --font-sm: 12px;
@@ -7,7 +7,7 @@
   --background: 16, 17, 20;
 }
 
-@font-face { src: url("/fonts/aeonik.woff2") format("woff2"); font-family: Aeonik; font-display: swap; }
+@font-face { src: url("https://app.proxima.tools/fonts/aeonik.woff2") format("woff2"); font-family: Aeonik; font-display: swap; }
 
 ._button_1o1ro_1 { display:flex;justify-content:center;align-items:center;row-gap:6px;column-gap:6px;transition-behavior:normal;transition-duration:0.2s;transition-timing-function:cubic-bezier(0.34, 1.56, 0.64, 1);transition-delay:0s;transition-property:all;cursor:pointer;border-top-left-radius:0px;border-top-right-radius:0px;border-bottom-right-radius:0px;border-bottom-left-radius:0px;padding-top:8px;padding-right:16px;padding-bottom:8px;padding-left:16px;width:fit-content;color:rgb(var(--text));--corner:8px;--b:1px;--offset:0px;position:relative }
 ._button_1o1ro_1:hover { --offset:4px }
