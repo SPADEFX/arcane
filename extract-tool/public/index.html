@@ -2436,9 +2436,7 @@ ${treeText.slice(0, 15000)}`;
       </div>
       <div class="lib-modal-footer">
         <input type="text" id="libModalName" placeholder="Component name..." value="ExtractedSection" />
-        <button id="libModalCopyTsx">Copy TSX</button>
-        <button id="libModalCopyCss">Copy CSS</button>
-        <button id="libModalDownload" class="primary">Download</button>
+        <button id="libModalAddToLib" class="primary">Add to Library</button>
         <div class="lib-modal-stats" id="libModalStats"></div>
       </div>
     </div>
@@ -2472,28 +2470,57 @@ ${treeText.slice(0, 15000)}`;
       if (e.target === overlay) overlay.classList.remove("show");
     });
 
-    // Copy TSX
-    document.getElementById("libModalCopyTsx").addEventListener("click", () => {
-      navigator.clipboard.writeText(tsxArea.value).then(() => showToast("TSX copied!"));
-    });
+    // Add to Library — save to IndexedDB (component registry)
+    document.getElementById("libModalAddToLib").addEventListener("click", () => {
+      const name = nameInput.value.trim() || "ExtractedSection";
+      const slug = name.replace(/([a-z])([A-Z])/g, "$1-$2").toLowerCase().replace(/[^a-z0-9]+/g, "-");
+      const component = {
+        id: "ext_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8),
+        slug: slug,
+        name: name,
+        description: "Extracted from " + (window.__capturedUrl || "unknown site"),
+        category: "extracted",
+        source: { type: "extracted", captureId: "" },
+        code: tsxArea.value,
+        css: cssArea.value,
+        props: window.__lastExtractProps || [],
+        defaultProps: {},
+        thumbnail: screenshotImg.src || "",
+        tags: ["extracted"],
+        isSection: true,
+        acceptsChildren: false,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
 
-    // Copy CSS
-    document.getElementById("libModalCopyCss").addEventListener("click", () => {
-      navigator.clipboard.writeText(cssArea.value).then(() => showToast("CSS copied!"));
-    });
-
-    // Download
-    document.getElementById("libModalDownload").addEventListener("click", () => {
-      const name = nameInput.value || "ExtractedSection";
-      const zip = `// ${name}.tsx\n${tsxArea.value}\n\n/* ${name}.module.css */\n${cssArea.value}`;
-      const blob = new Blob([zip], { type: "text/plain" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = name + ".tsx";
-      a.click();
-      URL.revokeObjectURL(url);
-      showToast("Downloaded " + name + ".tsx");
+      // Save to IndexedDB "arcane" database, "components" store
+      const req = indexedDB.open("arcane", 1);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains("components")) {
+          const store = db.createObjectStore("components", { keyPath: "id" });
+          store.createIndex("category", "category", { unique: false });
+          store.createIndex("slug", "slug", { unique: true });
+        }
+        if (!db.objectStoreNames.contains("projects")) db.createObjectStore("projects", { keyPath: "id" });
+        if (!db.objectStoreNames.contains("captures")) {
+          const store = db.createObjectStore("captures", { keyPath: "id" });
+          store.createIndex("status", "status", { unique: false });
+        }
+      };
+      req.onsuccess = () => {
+        const db = req.result;
+        const tx = db.transaction("components", "readwrite");
+        tx.objectStore("components").put(component);
+        tx.oncomplete = () => {
+          overlay.classList.remove("show");
+          showToast("✅ " + name + " added to Library!");
+          // Notify Studio if in iframe
+          try { window.parent.postMessage({ type: "arcane-component-added", component }, "*"); } catch(e) {}
+        };
+        tx.onerror = () => showToast("Error saving to library");
+      };
+      req.onerror = () => showToast("Error opening database");
     });
 
     // Expose function to open modal with data
@@ -2518,6 +2545,7 @@ ${treeText.slice(0, 15000)}`;
 
       // Props
       const props = comp.props || [];
+      window.__lastExtractProps = props;
       if (props.length) {
         propsList.innerHTML = props.map(p =>
           `<li><span class="prop-name">${p.name}</span><span class="prop-type">${p.tsType || p.type || "string"}</span><span style="color:var(--muted);margin-left:8px;font-size:10px">${p.defaultValue ? '= "' + String(p.defaultValue).slice(0, 30) + '"' : ""}</span></li>`
