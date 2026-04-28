@@ -44,7 +44,7 @@ export default function App() {
           <Suspense fallback={<Loading />}>
             <Routes>
               <Route path="/" element={<Home />} />
-              <Route path="/extract" element={<ExtractPage />} />
+              <Route path="/extract" element={<iframe src="http://localhost:3000" style={{ width: "100%", height: "100%", border: "none" }} title="Extract Tool" />} />
               <Route path="/shader-lab" element={<ShaderLabWrapper />} />
               <Route path="/library" element={<StorybookPage />} />
               <Route path="/builder" element={<BuilderDashboard />} />
