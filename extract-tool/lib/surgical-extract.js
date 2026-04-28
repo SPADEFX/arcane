@@ -523,6 +523,8 @@ module.exports = async function surgicalExtract(rootSelector, rootTreePath) {
   if (bgColor === "transparent" && bodyBg && bodyBg !== "rgba(0, 0, 0, 0)") {
     bgColor = bodyBg;
   }
+  // Ultimate fallback — never let it be undefined or transparent
+  if (!bgColor || bgColor === "transparent") bgColor = "#ffffff";
 
   return {
     html,

@@ -850,34 +850,28 @@ async function handleSaveToLibrary(req, res) {
           document.head.appendChild(l);
         }`).join("");
 
+      // Save CSS and HTML as separate files (avoids template literal escaping issues)
+      const cssFile = `extracted-${slug}.css`;
+      const htmlFile = `extracted-${slug}.html`;
+      fs.writeFileSync(path.join(componentsDir, htmlFile), rawHtml || "");
+
       const storyContent = `import type { Meta, StoryObj } from "@storybook/react";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
+import cssContent from "../components/${cssFile}?raw";
+import htmlContent from "../components/${htmlFile}?raw";
 
-// Extracted component — rendered via raw HTML + scoped CSS in Shadow DOM
 function ${name}Preview() {
-  useEffect(() => {
-    // Inject external stylesheets into main document for font loading
-    ${importUrls.map((u, i) => `
-    if (!document.getElementById("ext-font-${slug}-${i}")) {
-      var l = document.createElement("link");
-      l.id = "ext-font-${slug}-${i}";
-      l.rel = "stylesheet";
-      l.href = "${u.replace(/"/g, '\\"')}";
-      document.head.appendChild(l);
-    }`).join("")}
-  }, []);
+  const ref = useRef<HTMLDivElement>(null);
+  const [loaded, setLoaded] = useState(false);
 
-  return (
-    <div
-      ref={(el) => {
-        if (!el) return;
-        let shadow = el.shadowRoot;
-        if (!shadow) shadow = el.attachShadow({ mode: "open" });
-        shadow.innerHTML = \`<style>${(css || "").replace(/`/g, "\\`")}</style>${(rawHtml || tsx || "").replace(/`/g, "\\`")}\`;
-      }}
-      style={{ width: "100%" }}
-    />
-  );
+  useEffect(() => {
+    if (!ref.current || loaded) return;
+    const shadow = ref.current.attachShadow({ mode: "open" });
+    shadow.innerHTML = "<style>" + cssContent + "</style>" + htmlContent;
+    setLoaded(true);
+  }, [loaded]);
+
+  return <div ref={ref} style={{ width: "100%" }} />;
 }
 
 const meta = {
