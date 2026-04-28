@@ -380,11 +380,12 @@ module.exports = async function surgicalExtract(rootSelector, rootTreePath) {
 
   // ── Build scoped CSS string ────────────────────────────────────────
   let scopedCss = "";
-  // Include external stylesheets via @import — these load from the
-  // original CDN (cached by browser), ensuring ALL CSS is available
+  // Include external stylesheets via @import
   for (const url of externalStylesheets) {
     scopedCss += '@import url("' + url + '");\n';
   }
+  // Set the correct background on the Shadow DOM host
+  scopedCss += ':host { background: ' + bgColor + '; display: block; }\n';
   // CSS variables
   if (Object.keys(cssVars).length > 0) {
     scopedCss += ":root {\n";
@@ -453,6 +454,23 @@ module.exports = async function surgicalExtract(rootSelector, rootTreePath) {
     height: rootEl.offsetHeight,
   };
 
+  // Capture computed background of the section + ancestors for proper rendering
+  var bgColor = "transparent";
+  var bgEl = rootEl;
+  while (bgEl) {
+    var bg = getComputedStyle(bgEl).backgroundColor;
+    if (bg && bg !== "rgba(0, 0, 0, 0)" && bg !== "transparent") {
+      bgColor = bg;
+      break;
+    }
+    bgEl = bgEl.parentElement;
+  }
+  // Also get the body background as ultimate fallback
+  var bodyBg = getComputedStyle(document.body).backgroundColor;
+  if (bgColor === "transparent" && bodyBg && bodyBg !== "rgba(0, 0, 0, 0)") {
+    bgColor = bodyBg;
+  }
+
   return {
     html,
     scopedCss,
@@ -464,6 +482,7 @@ module.exports = async function surgicalExtract(rootSelector, rootTreePath) {
     transitions,
     dimensions,
     externalStylesheets,
+    bgColor,
     stats: {
       elements: sectionEls.size,
       cssRules: matchedRules.length,
