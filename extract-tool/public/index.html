@@ -1,0 +1,2289 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Extract Tool</title>
+  <style>
+    :root {
+      --bg: #0b0c0f; --fg: #e7e9ee; --muted: #8a8f9c; --accent: #7c9cff;
+      --border: #23262d; --card: #13151a; --danger: #ff6b6b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; background: var(--bg); color: var(--fg); font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
+
+    /* ── Landing (before extract) ── */
+    .landing { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 16px; transition: opacity 0.3s; }
+    .landing.hidden { opacity: 0; pointer-events: none; position: absolute; }
+    .landing h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; }
+    .landing p { color: var(--muted); font-size: 14px; }
+    .landing form { display: flex; gap: 8px; width: 100%; max-width: 600px; }
+    .landing input[type="text"] { flex: 1; background: var(--card); border: 1px solid var(--border); color: var(--fg); padding: 14px 16px; border-radius: 12px; font-size: 14px; outline: none; }
+    .landing input[type="text"]:focus { border-color: var(--accent); }
+    .landing button[type="submit"] { background: var(--accent); color: #0b0c0f; border: none; padding: 14px 22px; border-radius: 12px; font-weight: 600; font-size: 14px; cursor: pointer; }
+    .landing button[type="submit"]:disabled { opacity: 0.5; cursor: progress; }
+    .landing .opts { display: flex; gap: 10px; font-size: 12px; color: var(--muted); flex-wrap: wrap; justify-content: center; align-items: center; }
+    .landing .opts label { display: flex; gap: 4px; align-items: center; cursor: pointer; }
+    .landing .opts select, .landing .opts input[type="range"] { background: var(--card); color: var(--fg); border: 1px solid var(--border); border-radius: 6px; padding: 2px 6px; font-size: 11px; }
+    .status-line { font-size: 13px; color: var(--muted); min-height: 20px; }
+    .status-line.err { color: var(--danger); }
+
+    /* ── Catalogue ── */
+    .catalogue { width: 100%; max-width: 900px; margin-top: 24px; }
+    .catalogue h2 { font-size: 14px; font-weight: 600; color: var(--muted); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .catalogue-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+    .catalogue-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px; cursor: pointer; transition: border-color 0.15s; position: relative; }
+    .catalogue-card:hover { border-color: var(--accent); }
+    .catalogue-card .card-url { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px; }
+    .catalogue-card .card-meta { font-size: 11px; color: var(--muted); }
+    .catalogue-card .card-tokens { display: flex; gap: 3px; margin-top: 8px; flex-wrap: wrap; }
+    .catalogue-card .card-tokens span { width: 14px; height: 14px; border-radius: 3px; border: 1px solid var(--border); display: inline-block; }
+    .catalogue-card .card-delete { position: absolute; top: 8px; right: 8px; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 14px; opacity: 0; transition: opacity 0.15s; }
+    .catalogue-card:hover .card-delete, .catalogue-card:hover .card-files { opacity: 1 !important; }
+    .catalogue-empty { font-size: 13px; color: var(--muted); font-style: italic; }
+
+    /* ── Toolbar (floating bottom center) ── */
+    .toolbar-top { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); height: 48px; background: rgba(19,21,26,0.95); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; display: none; align-items: center; padding: 0 14px; gap: 4px; z-index: 100; box-shadow: 0 8px 32px rgba(0,0,0,0.6); }
+    .toolbar-top.show { display: flex; }
+    .toolbar-top .tool { background: none; border: 1px solid transparent; border-radius: 10px; color: var(--muted); width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 16px; transition: all 0.15s; }
+    .toolbar-top .tool:hover { color: var(--fg); background: rgba(255,255,255,0.06); }
+    .toolbar-top .tool.active { color: var(--accent); border-color: rgba(124,156,255,0.3); background: rgba(124,156,255,0.12); }
+    .toolbar-top .sep { width: 1px; height: 20px; background: var(--border); margin: 0 6px; }
+    .toolbar-top .url-display { flex: 1; font-size: 12px; color: var(--muted); text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    /* ── Side panel (sections collector) ── */
+    .side-panel { position: fixed; top: 12px; right: 12px; width: 420px; height: calc(100% - 24px); background: rgba(19,21,26,0.95); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; z-index: 150; display: flex; flex-direction: column; transform: translateX(calc(100% + 24px)); transition: transform 0.3s ease; box-shadow: 0 8px 40px rgba(0,0,0,0.5); overflow: hidden; }
+    .side-panel.open { transform: translateX(0); }
+    .side-panel-resize { position: absolute; left: -4px; top: 0; width: 8px; height: 100%; cursor: ew-resize; z-index: 5; border-radius: 16px 0 0 16px; }
+    .side-panel-resize:hover { background: rgba(124,156,255,0.12); }
+    .side-panel-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+    .side-panel-tabs { display: flex; }
+    .side-panel-tabs button { flex: 1; background: none; border: none; border-bottom: 2px solid transparent; color: var(--muted); padding: 10px; font-size: 12px; cursor: pointer; font-weight: 500; transition: color 0.15s; }
+    .side-panel-tabs button:hover { color: var(--fg); }
+    .side-panel-tabs button.active { color: var(--fg); border-bottom-color: var(--accent); }
+    .side-panel-view { display: none; flex: 1; overflow-y: auto; }
+    .side-panel-view.active { display: block; }
+    .side-panel-header h3 { font-size: 13px; font-weight: 600; }
+    .side-panel-header .count { font-size: 11px; color: var(--muted); background: #1b1e25; padding: 1px 8px; border-radius: 10px; }
+    .side-panel-header button { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 16px; }
+    .side-panel-body { flex: 1; overflow-y: auto; padding: 8px; }
+    .side-panel-footer { padding: 10px 16px; border-top: 1px solid var(--border); display: flex; gap: 6px; }
+    .section-card { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px; margin-bottom: 6px; cursor: grab; position: relative; transition: border-color 0.1s; }
+    .section-card:hover { border-color: var(--accent); }
+    .section-card.dragging { opacity: 0.5; }
+    .section-card .card-label { font-size: 12px; font-weight: 600; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .section-card .card-preview { font-size: 10px; color: var(--muted); max-height: 40px; overflow: hidden; word-break: break-all; line-height: 1.3; }
+    .section-card .card-actions { position: absolute; top: 6px; right: 6px; display: flex; gap: 4px; opacity: 0; transition: opacity 0.1s; }
+    .section-card:hover .card-actions { opacity: 1; }
+    .section-card .card-actions button { background: #1b1e25; border: 1px solid var(--border); color: var(--fg); width: 22px; height: 22px; border-radius: 5px; cursor: pointer; font-size: 11px; display: flex; align-items: center; justify-content: center; }
+    .side-panel-empty { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 12px; }
+
+    /* DOM tree */
+    .dom-tree { font-family: "Fira Code", "Cascadia Code", monospace; font-size: 11px; padding: 8px; line-height: 1.6; }
+    .dom-node { cursor: pointer; padding: 3px 4px; border-radius: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dom-node:hover { background: rgba(124,156,255,0.08); }
+    .dom-node.selected { background: rgba(124,156,255,0.18); }
+    .dom-node .bracket { color: #555; }
+    .dom-node .tag { color: #e06c75; }
+    .dom-node .attr-name { color: #d19a66; }
+    .dom-node .attr-val { color: #98c379; }
+    .dom-node .attr-id { color: #e5c07b; }
+    .dom-node .dots { color: #555; }
+    .dom-node .close-tag { color: #555; font-size: 10px; }
+    .dom-node .toggle { display: inline-block; width: 14px; color: var(--muted); font-size: 10px; text-align: center; cursor: pointer; user-select: none; }
+    .dom-node .toggle:empty { width: 14px; }
+    .dom-node .vis-btn { float: right; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 11px; opacity: 0; transition: opacity 0.1s; padding: 0 4px; }
+    .dom-node:hover .vis-btn { opacity: 0.6; }
+    .dom-node .vis-btn:hover { opacity: 1; }
+    .dom-node .vis-btn.hidden-el { opacity: 0.8; color: var(--danger); }
+    .dom-node.ghost { opacity: 0.3; }
+    .dom-node.ghost .tag { color: #555; }
+    .dom-node.ghost .attr-cls { color: #444; }
+    .dom-node.ghost::after { content: attr(data-reason); font-size: 9px; color: #555; margin-left: 6px; }
+    .dom-node .label-badge { font-size: 9px; padding: 2px 7px; border-radius: 4px; margin-left: 8px; font-weight: 600; letter-spacing: 0.02em; flex-shrink: 0; }
+    .dom-node .label-badge.nav { background: #2d4a3e; color: #6ee7b7; }
+    .dom-node .label-badge.hero { background: #3b2d4a; color: #c4b5fd; }
+    .dom-node .label-badge.footer { background: #4a3b2d; color: #fcd34d; }
+    .dom-node .label-badge.section { background: #2d3b4a; color: #93c5fd; }
+    .dom-node .label-badge.cta { background: #4a2d2d; color: #fca5a5; }
+    .dom-node .label-badge.img { background: #2d4a4a; color: #67e8f9; }
+    .dom-node .label-badge.form { background: #4a4a2d; color: #fde68a; }
+    .dom-mode-toggle { display: flex; gap: 4px; padding: 8px 10px; position: sticky; top: 0; background: var(--card); z-index: 10; border-bottom: 1px solid var(--border); align-items: center; }
+    .dom-mode-toggle button { padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--muted); font-size: 10px; cursor: pointer; font-weight: 500; }
+    .dom-mode-toggle button.active { background: rgba(124,156,255,0.12); color: var(--accent); border-color: rgba(124,156,255,0.3); }
+    .dom-tree.hide-classes .attr-name { display: none; }
+    .dom-tree.hide-classes .attr-val { display: none; }
+    .dom-tree.hide-classes .attr-id { display: none; }
+    .dom-tree.hide-classes .bracket { display: none; }
+    .dom-tree.hide-classes .close-tag { display: none; }
+    .dom-tree.hide-classes .dots { display: none; }
+    .dom-tree.hide-classes .dom-node .tag { font-size: 11px; }
+    .dom-tree.hide-classes .dom-node .tag::before { content: "<"; color: #555; }
+    .dom-tree.hide-classes .dom-node .tag::after { content: ">"; color: #555; }
+    .dom-tree.labeled-only .dom-node { opacity: 0.3; }
+    .dom-tree.labeled-only .dom-node.is-labeled { opacity: 1; }
+    .dom-tree.labeled-only .dom-node.is-ancestor { opacity: 0.6; }
+    .dom-tree.labeled-only .dom-children.collapsed { display: none; }
+    .dom-node.dragging-dom { opacity: 0.4; }
+    .dom-node.drag-over { border-bottom: 2px solid var(--accent); }
+    .dom-children { padding-left: 14px; border-left: 1px solid rgba(255,255,255,0.06); margin-left: 8px; }
+    .dom-children.collapsed { display: none; }
+
+    /* Context menu */
+    .ctx-menu { position: fixed; background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 4px 0; min-width: 180px; z-index: 500; box-shadow: 0 8px 32px rgba(0,0,0,0.5); display: none; }
+    .ctx-menu.show { display: block; }
+    .ctx-menu button { display: flex; align-items: center; gap: 8px; width: 100%; background: none; border: none; color: var(--fg); padding: 7px 14px; font-size: 12px; cursor: pointer; text-align: left; }
+    .ctx-menu button:hover { background: rgba(124,156,255,0.12); }
+    .ctx-menu .sep { height: 1px; background: var(--border); margin: 4px 0; }
+
+    /* ── Animation timeline panel ── */
+    .anim-panel { position: fixed; bottom: 70px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 800px; background: var(--card); border: 1px solid var(--border); border-radius: 14px; z-index: 200; display: none; box-shadow: 0 -4px 32px rgba(0,0,0,0.5); max-height: 300px; overflow: hidden; flex-direction: column; }
+    .anim-panel.open { display: flex; }
+    .anim-controls { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--border); }
+    .anim-controls button { background: none; border: 1px solid var(--border); color: var(--fg); width: 30px; height: 30px; border-radius: 8px; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; }
+    .anim-controls button.active { border-color: var(--accent); color: var(--accent); }
+    .anim-controls input[type="range"] { flex: 1; }
+    .anim-controls .time-label { font-size: 11px; color: var(--muted); min-width: 80px; text-align: center; font-family: monospace; }
+    .anim-tracks { overflow-y: auto; padding: 8px 16px; flex: 1; }
+    .anim-track { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; font-size: 11px; }
+    .anim-track .track-label { width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+    .anim-track .track-bar-wrap { flex: 1; height: 18px; background: #1b1e25; border-radius: 4px; position: relative; overflow: hidden; }
+    .anim-track .track-bar { position: absolute; height: 100%; background: rgba(124,156,255,0.3); border: 1px solid rgba(124,156,255,0.5); border-radius: 4px; min-width: 4px; }
+    .anim-playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--accent); z-index: 2; transition: left 0.05s linear; }
+
+    .toast { position: fixed; bottom: 76px; left: 50%; transform: translateX(-50%); background: var(--accent); color: #0b0c0f; padding: 6px 18px; border-radius: 8px; font-size: 12px; font-weight: 600; z-index: 500; opacity: 0; transition: opacity 0.2s; pointer-events: none; }
+    .toast.show { opacity: 1; }
+
+    /* ── Fullscreen preview ── */
+    .preview-mode { display: none; width: 100%; height: 100%; position: relative; transition: margin-right 0.25s ease; }
+    .preview-mode.panel-open { margin-right: 444px; }
+    .preview-mode.active { display: block; }
+    .preview-mode iframe { width: 100%; height: 100%; border: none; background: #fff; display: block; pointer-events: auto !important; }
+
+
+    /* ── Floating drawer ── */
+    .drawer-toggle { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 8px 20px; font-size: 13px; color: var(--fg); cursor: pointer; z-index: 200; display: none; box-shadow: 0 4px 24px rgba(0,0,0,0.4); }
+    .drawer-toggle.show { display: flex; align-items: center; gap: 8px; }
+    .drawer-toggle:hover { border-color: var(--accent); }
+    .drawer { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 90%; max-width: 900px; max-height: 70vh; background: var(--card); border: 1px solid var(--border); border-radius: 16px 16px 0 0; z-index: 300; display: none; flex-direction: column; box-shadow: 0 -4px 32px rgba(0,0,0,0.5); }
+    .drawer.open { display: flex; }
+    .drawer-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 20px; border-bottom: 1px solid var(--border); cursor: pointer; }
+    .drawer-header h3 { font-size: 14px; font-weight: 600; }
+    .drawer-header .close-btn { background: none; border: none; color: var(--muted); font-size: 18px; cursor: pointer; }
+    .drawer-body { overflow-y: auto; padding: 16px 20px; }
+    .drawer-body .section { margin-bottom: 16px; }
+    .drawer-body .section-title { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+
+    /* Tech & stats */
+    .tech-line { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+    .tech-line .badge { display: inline-block; padding: 1px 7px; background: #1b1e25; border-radius: 5px; color: var(--fg); font-size: 11px; margin-right: 4px; }
+    .tech-line .warn { color: #ffb86b; }
+
+    /* Selector */
+    .selector-row { display: flex; gap: 6px; align-items: center; }
+    .selector-row input { flex: 1; background: var(--bg); color: var(--fg); border: 1px solid var(--border); padding: 6px 10px; border-radius: 8px; font-size: 12px; }
+    .selector-row button { background: #1b1e25; color: var(--fg); border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; font-size: 12px; cursor: pointer; }
+
+    /* Tabs */
+    .tab-bar { display: flex; gap: 0; margin-bottom: 8px; }
+    .tab-bar button { background: transparent; color: var(--muted); border: none; border-bottom: 2px solid transparent; padding: 6px 14px; font-size: 12px; cursor: pointer; }
+    .tab-bar button.active { color: var(--fg); border-bottom-color: var(--accent); }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+    .tab-panel pre { background: #0d0e12; color: #c5cad3; border: 1px solid var(--border); border-radius: 8px; padding: 10px; font-family: "Fira Code", monospace; font-size: 11px; line-height: 1.5; max-height: 300px; overflow: auto; white-space: pre-wrap; word-break: break-all; }
+    .tab-panel .row { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+    .tab-panel select { background: var(--bg); color: var(--fg); border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; font-size: 12px; }
+    .tab-panel input[type="text"] { flex: 1; background: var(--bg); color: var(--fg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 12px; }
+    .btn { background: var(--accent); color: #0b0c0f; border: none; padding: 6px 14px; border-radius: 8px; font-weight: 600; font-size: 12px; cursor: pointer; }
+    .btn:disabled { opacity: 0.5; cursor: progress; }
+    .btn-ghost { background: none; border: 1px solid var(--border); color: var(--fg); padding: 6px 14px; border-radius: 8px; font-size: 12px; cursor: pointer; }
+    .token-preview { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0; }
+    .token-swatch { width: 20px; height: 20px; border-radius: 4px; border: 1px solid var(--border); }
+    .hint { font-size: 10px; color: var(--muted); margin-top: 4px; }
+
+
+    /* Download buttons */
+    .dl-row { display: flex; gap: 6px; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <!-- Landing -->
+  <div class="landing" id="landing">
+    <h1>Extract Tool</h1>
+    <p>Colle l'URL d'un site. Extraction fidèle en un clic.</p>
+    <form id="form" style="flex-wrap:wrap">
+      <input id="url" type="text" placeholder="example.com" required autocomplete="off" style="min-width:0" />
+      <button id="go" type="submit">Extract</button>
+      <button type="button" id="analyzeBtn" style="background:transparent;border:1px solid var(--border);color:var(--muted);padding:14px 16px;border-radius:12px;font-size:14px;cursor:pointer;white-space:nowrap" title="Analyser la stack technique du site">🔍 Scan</button>
+    </form>
+    <div class="opts">
+      <label><input type="checkbox" id="fullClone" /> Full Clone (JS inclus)</label>
+      <label><input type="checkbox" id="thorough" /> Approfondi</label>
+      <label>Passes: <input type="range" id="passes" min="1" max="10" value="1" style="width:70px" /><span id="passesLabel">1</span></label>
+      <label>Ralentir: <input type="range" id="slowdown" min="10" max="40" value="10" step="1" style="width:70px" /><span id="slowdownLabel">1.0×</span></label>
+      <label>Viewport: <select id="vpPreset">
+        <option value="1920x1080">1920</option>
+        <option value="1440x900" selected>1440</option>
+        <option value="1280x800">1280</option>
+        <option value="768x1024">768</option>
+        <option value="375x812">375</option>
+      </select></label>
+    </div>
+    <div class="status-line" id="status"></div>
+
+    <!-- Analyse panel -->
+    <div id="analyzePanel" style="display:none;width:calc(100% - 32px);max-width:700px;margin-top:16px;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;text-align:left;max-height:60vh;overflow-y:auto">
+    </div>
+
+    <div class="catalogue" id="catalogue">
+      <h2>Catalogue</h2>
+      <div class="catalogue-grid" id="catalogueGrid"></div>
+    </div>
+  </div>
+
+  <!-- Clone files drawer -->
+  <div id="cloneDrawer" style="display:none;position:fixed;inset:0;z-index:600;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px)">
+    <div style="position:absolute;right:0;top:0;width:420px;max-width:90vw;height:100%;background:var(--card);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden">
+      <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+        <h3 style="font-size:14px;font-weight:600" id="cloneDrawerTitle">Fichiers du clone</h3>
+        <button id="cloneDrawerClose" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px">✕</button>
+      </div>
+      <div id="cloneDrawerSummary" style="padding:12px 20px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap"></div>
+      <div id="cloneDrawerList" style="flex:1;overflow-y:auto;padding:8px 12px"></div>
+      <div style="padding:12px 20px;border-top:1px solid var(--border);display:flex;gap:8px">
+        <a id="cloneOpenBtn" href="#" target="_blank" class="btn" style="font-size:12px;text-decoration:none;text-align:center;flex:1">Ouvrir le clone</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fullscreen preview -->
+  <div class="preview-mode" id="previewMode">
+    <iframe id="preview"></iframe>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="toolbar-top" id="toolbarTop">
+    <button class="tool" id="toolBack" title="Retour">←</button>
+    <div class="sep"></div>
+    <button class="tool" id="toolPick" title="Pick section (copie au clic)">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 3l4.5 10 1.5-4 4-1.5L3 3z"/><path d="M9 9l4 4"/></svg>
+    </button>
+    <div class="sep"></div>
+    <span class="url-display" id="toolbarUrl"></span>
+    <div class="sep"></div>
+    <span style="font-size:11px;color:var(--muted)" id="toolbarSize">1440×900</span>
+    <div class="sep"></div>
+    <button class="tool" id="toolAnim" title="Timeline animations">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="4,3 13,8 4,13"/></svg>
+    </button>
+    <button class="tool" id="toolSections" title="Sections collectées">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>
+    </button>
+    <div class="sep"></div>
+    <button class="tool active" id="viewProxy" title="Site live (proxy)" style="width:auto;padding:0 10px;gap:5px;font-size:11px">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M2 8h12M8 2c2 2 3 4 3 6s-1 4-3 6M8 2c-2 2-3 4-3 6s1 4 3 6"/></svg>
+      Live
+    </button>
+    <button class="tool" id="viewReel" title="HTML capturé (offline)" style="width:auto;padding:0 10px;gap:5px;font-size:11px">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 2h7l3 3v9H3V2z"/><path d="M10 2v3h3"/></svg>
+      Capturé
+    </button>
+    <div class="sep"></div>
+    <button class="tool" id="toolDrawer" title="Options & Code">☰</button>
+  </div>
+  <!-- Animation timeline -->
+  <div class="anim-panel" id="animPanel">
+    <div class="anim-controls">
+      <button id="animReset" title="Reset">⏮</button>
+      <button id="animPlay" title="Play">▶</button>
+      <button id="animPause" title="Pause">⏸</button>
+      <input type="range" id="animScrub" min="0" max="5000" value="0" step="10" />
+      <span class="time-label" id="animTime">0.00s / 0.00s</span>
+    </div>
+    <div class="anim-tracks" id="animTracks"></div>
+  </div>
+
+  <div class="toast" id="toast">Copié !</div>
+  <div class="ctx-menu" id="ctxMenu">
+    <button id="ctxGoto">↗ Aller à l'élément</button>
+    <button id="ctxAdd">+ Ajouter à la bibliothèque</button>
+    <div class="sep"></div>
+    <button id="ctxCopyHtml">Copier le HTML</button>
+    <button id="ctxCopySelector">Copier le sélecteur CSS</button>
+    <div class="sep"></div>
+    <button id="ctxExtract">Extraire cette section seule</button>
+    <button id="ctxClone">🧬 Cloner cette section (HTML+CSS+JS)</button>
+  </div>
+
+  <!-- Side panel: sections collector -->
+  <div class="side-panel" id="sidePanel">
+    <div class="side-panel-resize" id="panelResize"></div>
+    <div class="side-panel-header">
+      <h3>Sections <span class="count" id="sectionCount">0</span></h3>
+      <button id="sidePanelClose">✕</button>
+    </div>
+    <div class="side-panel-tabs" style="border-bottom:1px solid var(--border)">
+      <button data-view="dom" class="active">DOM</button>
+      <button data-view="sections">Collecté</button>
+    </div>
+    <div class="side-panel-view" id="sectionList" data-view="sections">
+      <div class="side-panel-empty">Active le pick (🖱) puis clique sur des sections.</div>
+    </div>
+    <div class="side-panel-view active" id="domTree" data-view="dom">
+      <div class="dom-mode-toggle">
+        <button id="domModeRaw">Raw</button>
+        <button id="domModeSmart" class="active">Clean</button>
+        <button id="domModeAI">AI Label</button>
+        <label style="font-size:10px;color:var(--muted);gap:3px;display:flex;align-items:center;margin-left:auto;cursor:pointer"><input type="checkbox" id="hideClasses" style="accent-color:var(--accent)"> Classes</label>
+        <label id="labeledOnlyWrap" style="display:none;font-size:10px;color:var(--muted);gap:3px;align-items:center;cursor:pointer"><input type="checkbox" id="labeledOnly" checked style="accent-color:var(--accent)"> Labelisés</label>
+      </div>
+      <div class="dom-tree" id="domTreeContent"></div>
+    </div>
+    <div class="side-panel-footer">
+      <button class="btn" id="exportSectionsBtn" style="flex:1">Exporter tout</button>
+      <button class="btn-ghost" id="clearSectionsBtn">Vider</button>
+    </div>
+  </div>
+
+  <!-- Floating drawer -->
+  <div class="drawer" id="drawer">
+    <div class="drawer-header" id="drawerHeader">
+      <h3>Extract Tool — <span id="drawerUrl"></span></h3>
+      <button class="close-btn" id="drawerClose">✕</button>
+    </div>
+    <div class="drawer-body">
+      <!-- Stats & Tech -->
+      <div class="section">
+        <div class="section-title">Infos</div>
+        <div class="tech-line" id="statsLine"></div>
+        <div class="tech-line" id="techLine"></div>
+      </div>
+
+      <!-- Section picker -->
+      <div class="section">
+        <div class="section-title">Section</div>
+        <div class="selector-row">
+          <input id="selectorInput" type="text" placeholder="CSS selector (.hero, #pricing, nav)" />
+          <button id="pickBtn">Pick</button>
+          <button id="extractSectionBtn">Extraire</button>
+        </div>
+      </div>
+
+      <!-- Downloads -->
+      <div class="section">
+        <div class="section-title">Télécharger</div>
+        <div class="dl-row">
+          <a id="dlHtml" class="btn-ghost" download="capture.html">HTML</a>
+          <a id="dlJson" class="btn-ghost" download="capture.json">JSON</a>
+          <a id="openNew" class="btn-ghost" target="_blank" rel="noopener">Ouvrir onglet</a>
+        </div>
+      </div>
+
+      <!-- Tabs: Code / Generate / Tokens -->
+      <div class="section">
+        <div class="tab-bar" id="tabBar">
+          <button class="active" data-tab="code">Code</button>
+          <button data-tab="reverse">Reverse</button>
+          <button data-tab="generate">Générer</button>
+          <button data-tab="tokens">Tokens</button>
+        </div>
+        <div class="tab-panel active" data-tab="code">
+          <div class="row">
+            <select id="langSelect">
+              <option value="html">HTML + CSS</option>
+              <option value="react">React</option>
+              <option value="vue">Vue 3</option>
+              <option value="svelte">Svelte</option>
+              <option value="tailwind">Tailwind</option>
+              <option value="nextjs">Next.js</option>
+            </select>
+            <button class="btn" id="convertBtn">Convertir</button>
+            <button class="btn-ghost" id="copyCodeBtn">Copier</button>
+          </div>
+          <pre id="codeOutput">Sélectionne un langage et clique Convertir.</pre>
+          <div class="hint" id="apiHint"></div>
+        </div>
+        <div class="tab-panel" data-tab="reverse">
+          <div id="reverseInfo" style="margin-bottom:10px"></div>
+          <div class="row">
+            <input id="recreatePrompt" type="text" placeholder="Ex: recreate this hero animation in React + Framer Motion" />
+            <select id="recreateLang">
+              <option value="html">HTML + JS</option>
+              <option value="react">React</option>
+              <option value="three">Three.js</option>
+              <option value="gsap">GSAP</option>
+              <option value="tailwind">Tailwind + JS</option>
+            </select>
+            <button class="btn" id="recreateBtn">Recréer avec AI</button>
+          </div>
+          <pre id="recreateOutput">Données extraites affichées ci-dessus. Clique "Recréer" pour générer du code équivalent.</pre>
+          <div class="hint" id="recreateHint"></div>
+        </div>
+        <div class="tab-panel" data-tab="generate">
+          <div class="row">
+            <input id="genPrompt" type="text" placeholder="pricing section, hero avec CTA, testimonials grid..." />
+            <select id="genLang">
+              <option value="html">HTML</option>
+              <option value="react">React</option>
+              <option value="tailwind">Tailwind</option>
+              <option value="nextjs">Next.js</option>
+            </select>
+            <button class="btn" id="generateBtn">Générer</button>
+          </div>
+          <pre id="genOutput">Décris la section. Les design tokens du site sont envoyés à Claude pour matcher le style.</pre>
+        </div>
+        <div class="tab-panel" data-tab="tokens">
+          <div id="tokensDisplay"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ── IndexedDB catalogue ──
+    const DB_NAME = "extract-tool";
+    const DB_VERSION = 1;
+    const STORE = "captures";
+    function openDB() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, DB_VERSION);
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          if (!db.objectStoreNames.contains(STORE)) {
+            db.createObjectStore(STORE, { keyPath: "id", autoIncrement: true });
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+    async function saveCapture(data) {
+      const db = await openDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, "readwrite");
+        tx.objectStore(STORE).add(data);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+    async function getAllCaptures() {
+      const db = await openDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, "readonly");
+        const req = tx.objectStore(STORE).getAll();
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+    async function getCapture(id) {
+      const db = await openDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, "readonly");
+        const req = tx.objectStore(STORE).get(id);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+    async function deleteCapture(id) {
+      const db = await openDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, "readwrite");
+        tx.objectStore(STORE).delete(id);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+    async function renderCatalogue() {
+      const grid = document.getElementById("catalogueGrid");
+      try {
+        const captures = await getAllCaptures();
+        if (captures.length === 0) {
+          grid.innerHTML = '<p class="catalogue-empty">Aucune capture sauvegardée. Lance un Extract pour commencer.</p>';
+          return;
+        }
+        grid.innerHTML = captures.sort((a, b) => b.savedAt - a.savedAt).map(c => {
+          const date = new Date(c.savedAt).toLocaleDateString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+          const colors = (c.tokens && c.tokens.colors || []).slice(0, 8);
+          const swatches = colors.map(cl => `<span style="background:${cl}"></span>`).join("");
+          const cloneBadge = c.cloneId ? `<span style="display:inline-block;background:rgba(124,156,255,0.15);color:var(--accent);font-size:10px;padding:2px 6px;border-radius:4px;margin-left:6px;font-weight:600">JS</span>` : "";
+          const filesBtn = c.cloneId ? `<button class="card-files" data-clone="${c.cloneId}" style="position:absolute;bottom:8px;right:8px;background:none;border:1px solid var(--border);color:var(--muted);cursor:pointer;font-size:10px;padding:2px 8px;border-radius:4px;opacity:0;transition:opacity 0.15s">Fichiers</button>` : "";
+          return `<div class="catalogue-card" data-id="${c.id}">
+            <button class="card-delete" data-del="${c.id}">✕</button>
+            <div class="card-url">${c.hostname || c.url}${cloneBadge}</div>
+            <div class="card-meta">${date} · ${c.nodeCount || "?"} nodes</div>
+            ${swatches ? `<div class="card-tokens">${swatches}</div>` : ""}
+            ${filesBtn}
+          </div>`;
+        }).join("");
+        // Click to open
+        grid.querySelectorAll(".catalogue-card").forEach(card => {
+          card.addEventListener("click", async (e) => {
+            if (e.target.classList.contains("card-delete")) return;
+            const id = Number(card.dataset.id);
+            const cap = await getCapture(id);
+            if (!cap) return;
+            openSavedCapture(cap);
+          });
+        });
+        // Delete
+        grid.querySelectorAll(".card-delete").forEach(btn => {
+          btn.addEventListener("click", async (e) => {
+            e.stopPropagation();
+            await deleteCapture(Number(btn.dataset.del));
+            renderCatalogue();
+          });
+        });
+        // Files buttons
+        grid.querySelectorAll(".card-files").forEach(btn => {
+          btn.addEventListener("click", async (e) => {
+            e.stopPropagation();
+            openCloneDrawer(btn.dataset.clone);
+          });
+        });
+      } catch (e) {
+        grid.innerHTML = '<p class="catalogue-empty">Erreur IndexedDB.</p>';
+      }
+    }
+
+    // Clone files drawer
+    async function openCloneDrawer(cloneId) {
+      const drawer = document.getElementById("cloneDrawer");
+      const list = document.getElementById("cloneDrawerList");
+      const summary = document.getElementById("cloneDrawerSummary");
+      drawer.style.display = "block";
+      list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">Chargement...</div>';
+      try {
+        const resp = await fetch("/api/clone-files?id=" + cloneId);
+        const json = await resp.json();
+        if (!json.ok) throw new Error(json.error);
+        const s = json.summary;
+        const totalMB = (s.totalSize / 1024 / 1024).toFixed(1);
+        summary.innerHTML = `<span>${s.js} JS</span><span>${s.css} CSS</span><span>${s.images} images</span><span>${totalMB} MB total</span>`;
+        document.getElementById("cloneOpenBtn").href = json.htmlPath;
+        document.getElementById("cloneDrawerTitle").textContent = "Clone " + cloneId.replace("clone_", "");
+
+        const icons = { js: "📜", css: "🎨", image: "🖼️", other: "📄" };
+        const typeOrder = { js: 0, css: 1, image: 2, other: 3 };
+        const sorted = json.assets.sort((a, b) => (typeOrder[a.type] || 9) - (typeOrder[b.type] || 9));
+        list.innerHTML = `<div style="margin-bottom:8px">
+          <a href="${json.htmlPath}" target="_blank" style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:rgba(124,156,255,0.08);border:1px solid rgba(124,156,255,0.2);border-radius:8px;color:var(--fg);text-decoration:none;font-size:12px;font-weight:600">
+            📄 index.html <span style="margin-left:auto;color:var(--muted);font-weight:400">${(json.htmlSize/1024).toFixed(0)} KB</span>
+          </a>
+        </div>` + sorted.map(a => {
+          const sizeKB = (a.size / 1024).toFixed(0);
+          return `<a href="${a.path}" target="_blank" style="display:flex;align-items:center;gap:8px;padding:5px 10px;border-radius:6px;color:var(--fg);text-decoration:none;font-size:11px;transition:background 0.1s" onmouseenter="this.style.background='rgba(255,255,255,0.04)'" onmouseleave="this.style.background=''">
+            ${icons[a.type] || "📄"} ${a.name} <span style="margin-left:auto;color:var(--muted)">${sizeKB} KB</span>
+          </a>`;
+        }).join("");
+      } catch (e) {
+        list.innerHTML = `<div style="color:var(--danger);padding:20px;text-align:center">${e.message}</div>`;
+      }
+    }
+    document.getElementById("cloneDrawerClose").addEventListener("click", () => {
+      document.getElementById("cloneDrawer").style.display = "none";
+    });
+    document.getElementById("cloneDrawer").addEventListener("click", (e) => {
+      if (e.target === document.getElementById("cloneDrawer")) document.getElementById("cloneDrawer").style.display = "none";
+    });
+
+    async function openSavedCapture(cap) {
+      revokeOld();
+      const blob = new Blob([cap.html], { type: "text/html" });
+      currentHtmlUrl = URL.createObjectURL(blob);
+      document.getElementById("dlHtml").href = currentHtmlUrl;
+      window.__capturedHtml = cap.html;
+      window.__designTokens = cap.tokens;
+      window.__capturedUrl = cap.url;
+      renderTokens(cap.tokens);
+      document.getElementById("drawerUrl").textContent = cap.hostname || cap.url;
+      document.getElementById("toolbarUrl").textContent = cap.url;
+      statsLine.textContent = cap.stats || "";
+      domTreeBuilt = false;
+
+      // Auto-start proxy for JS/canvas animations
+      try {
+        const resp = await fetch("/api/proxy", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ url: cap.url }),
+        });
+        const json = await resp.json();
+        if (json.ok && json.proxyUrl) {
+          preview.src = json.proxyUrl;
+          document.getElementById("openNew").href = json.proxyUrl;
+          statsLine.textContent = (cap.stats || "") + " · proxy " + json.proxyUrl;
+        } else {
+          preview.src = currentHtmlUrl;
+          document.getElementById("openNew").href = currentHtmlUrl;
+        }
+      } catch(e) {
+        preview.src = currentHtmlUrl;
+        document.getElementById("openNew").href = currentHtmlUrl;
+      }
+      enterPreview();
+    }
+    renderCatalogue();
+
+    const landing = document.getElementById("landing");
+    const previewMode = document.getElementById("previewMode");
+    const preview = document.getElementById("preview");
+    const form = document.getElementById("form");
+    const urlInput = document.getElementById("url");
+    const go = document.getElementById("go");
+    const status = document.getElementById("status");
+    const backBtn = document.getElementById("backBtn");
+    const drawerToggle = document.getElementById("drawerToggle");
+    const drawer = document.getElementById("drawer");
+    const statsLine = document.getElementById("statsLine");
+    const techLine = document.getElementById("techLine");
+
+    let currentHtmlUrl = null, currentJsonUrl = null;
+
+    // Options
+    const passesInput = document.getElementById("passes");
+    const passesLabel = document.getElementById("passesLabel");
+    passesInput.addEventListener("input", () => { passesLabel.textContent = passesInput.value; });
+    const slowdownInput = document.getElementById("slowdown");
+    const slowdownLabel = document.getElementById("slowdownLabel");
+    const readSlowdown = () => Number(slowdownInput.value) / 10;
+    slowdownInput.addEventListener("input", () => { slowdownLabel.textContent = readSlowdown().toFixed(1) + "×"; });
+    function getViewport() { return document.getElementById("vpPreset").value; }
+
+    function setStatus(msg, isErr) {
+      status.textContent = msg || "";
+      status.classList.toggle("err", !!isErr);
+    }
+    function revokeOld() {
+      if (currentHtmlUrl) URL.revokeObjectURL(currentHtmlUrl);
+      if (currentJsonUrl) URL.revokeObjectURL(currentJsonUrl);
+      currentHtmlUrl = currentJsonUrl = null;
+    }
+
+    const toolbarTop = document.getElementById("toolbarTop");
+    const toast = document.getElementById("toast");
+    let pickMode = false;
+
+    function showToast(msg) {
+      toast.textContent = msg;
+      toast.classList.add("show");
+      setTimeout(() => toast.classList.remove("show"), 1500);
+    }
+    function enterPreview() {
+      landing.classList.add("hidden");
+      previewMode.classList.add("active");
+      previewMode.classList.add("panel-open");
+      toolbarTop.classList.add("show");
+      sidePanel.classList.add("open");
+      // Build DOM tree
+      if (!domTreeBuilt && window.__capturedHtml) buildDomTree();
+      // Request proxy DOM when iframe loads (for Live mode)
+      if (currentView === "proxy") {
+        preview.addEventListener("load", function onLoad() {
+          preview.removeEventListener("load", onLoad);
+          requestProxyDom();
+        });
+      }
+    }
+    function exitPreview() {
+      landing.classList.remove("hidden");
+      previewMode.classList.remove("active");
+      toolbarTop.classList.remove("show");
+      drawer.classList.remove("open");
+      setPickMode(false);
+    }
+    function setPickMode(on) {
+      pickMode = on;
+      document.getElementById("toolPick").classList.toggle("active", on);
+      try {
+        preview.contentWindow.postMessage(on ? "mx-pick-on" : "mx-pick-off", "*");
+      } catch(e) {}
+    }
+    document.getElementById("toolBack").addEventListener("click", exitPreview);
+    document.getElementById("toolDrawer").addEventListener("click", () => drawer.classList.toggle("open"));
+    document.getElementById("drawerClose").addEventListener("click", () => drawer.classList.remove("open"));
+    document.getElementById("toolPick").addEventListener("click", () => setPickMode(!pickMode));
+
+    // ── Resize via edge drag ──
+    let resizing = false;
+    previewMode.addEventListener("mousedown", (e) => {
+      const rect = preview.getBoundingClientRect();
+      const nearRight = Math.abs(e.clientX - rect.right) < 16;
+      const nearBottom = Math.abs(e.clientY - rect.bottom) < 16;
+      if (!nearRight && !nearBottom) return;
+      e.preventDefault();
+      resizing = true;
+      const axis = nearRight ? "x" : "y";
+      const startPos = axis === "x" ? e.clientX : e.clientY;
+      const startSize = axis === "x" ? rect.width : rect.height;
+      preview.style.pointerEvents = "none";
+      const onMove = (e2) => {
+        if (!resizing) return;
+        const delta = (axis === "x" ? e2.clientX : e2.clientY) - startPos;
+        const v = Math.max(280, startSize + delta);
+        if (axis === "x") preview.style.width = v + "px";
+        else preview.style.height = v + "px";
+        document.getElementById("toolbarSize").textContent = `${Math.round(preview.offsetWidth)}×${Math.round(preview.offsetHeight)}`;
+      };
+      const onUp = () => {
+        resizing = false;
+        preview.style.pointerEvents = "";
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+      };
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+    });
+
+    // ── Site Analysis ──
+    document.getElementById("analyzeBtn").addEventListener("click", async () => {
+      let url = urlInput.value.trim();
+      if (!url) return;
+      if (!/^https?:\/\//i.test(url)) url = "https://" + url;
+      const btn = document.getElementById("analyzeBtn");
+      const panel = document.getElementById("analyzePanel");
+      btn.disabled = true;
+      btn.textContent = "⏳ Scan...";
+      panel.style.display = "block";
+      panel.innerHTML = '<div style="color:var(--muted);text-align:center;padding:20px">Analyse en cours...</div>';
+
+      try {
+        const resp = await fetch("/api/analyze-site", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ url }),
+        });
+        const json = await resp.json();
+        if (!json.ok) throw new Error(json.error || "Erreur");
+        const r = json.report;
+
+        // Score color
+        const scoreColor = r.score >= 75 ? "#4ade80" : r.score >= 50 ? "#fbbf24" : r.score >= 25 ? "#fb923c" : "#f87171";
+        const scoreLabel = r.score >= 75 ? "Excellent" : r.score >= 50 ? "Moyen" : r.score >= 25 ? "Difficile" : "Très difficile";
+
+        let html = `
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px">
+            <div>
+              <div style="font-size:16px;font-weight:700">${r.title || r.url}</div>
+              <div style="font-size:11px;color:var(--muted)">${r.url}</div>
+            </div>
+            <div style="text-align:center">
+              <div style="font-size:32px;font-weight:800;color:${scoreColor}">${r.score}</div>
+              <div style="font-size:10px;color:${scoreColor};font-weight:600">${scoreLabel}</div>
+            </div>
+          </div>
+        `;
+
+        // Frameworks
+        if (r.frameworks.length) {
+          html += '<div style="margin-bottom:14px"><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Frameworks</div>';
+          html += r.frameworks.map(f => `<span style="display:inline-block;background:#1b1e25;border:1px solid var(--border);border-radius:6px;padding:3px 10px;font-size:12px;margin:2px 4px 2px 0">${f.name} <span style="color:var(--muted)">${f.version !== "?" ? f.version : ""}</span></span>`).join("");
+          html += '</div>';
+        }
+
+        // CSS
+        html += '<div style="margin-bottom:14px"><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:6px">CSS</div>';
+        html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:4px;font-size:12px">';
+        html += `<div>${r.css.totalRules} règles CSS</div>`;
+        html += `<div>${r.css.externalSheets} feuilles externes</div>`;
+        html += `<div>${r.css.inlineStyleTags} balises &lt;style&gt;</div>`;
+        html += `<div>${r.css.keyframesRules} @keyframes</div>`;
+        if (r.css.inaccessibleSheets > 0) html += `<div style="color:#fb923c">${r.css.inaccessibleSheets} feuilles inaccessibles ⚠</div>`;
+        if (r.css.cssInJs) html += `<div style="color:#fbbf24">CSS-in-JS: ${r.css.cssInJsType}</div>`;
+        if (r.css.tailwind) html += `<div style="color:#38bdf8">Tailwind CSS</div>`;
+        if (r.css.cssModules) html += `<div>CSS Modules (classes hashées)</div>`;
+        html += `<div>${r.css.fontFaces} @font-face</div>`;
+        html += `<div>${r.css.cssVars} CSS variables</div>`;
+        html += '</div></div>';
+
+        // Animations
+        html += '<div style="margin-bottom:14px"><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Animations</div>';
+        html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:4px;font-size:12px">';
+        if (r.animations.cssAnimations) html += `<div style="color:#4ade80">${r.animations.cssAnimations} CSS animations ✓</div>`;
+        if (r.animations.cssTransitions) html += `<div>${r.animations.cssTransitions} CSS transitions</div>`;
+        if (r.animations.waapi) html += `<div>${r.animations.waapi} Web Animations API</div>`;
+        if (r.animations.gsap) html += `<div style="color:#fbbf24">GSAP ${r.animations.gsapPlugins.length ? "(" + r.animations.gsapPlugins.join(", ") + ")" : ""}</div>`;
+        if (r.animations.framerMotion) html += `<div style="color:#fbbf24">Framer Motion</div>`;
+        if (r.animations.animejs) html += `<div>anime.js</div>`;
+        if (r.animations.lottie) html += `<div style="color:#fb923c">Lottie (${r.animations.lottiePlayers} players)</div>`;
+        if (r.animations.smil) html += `<div>${r.animations.smil} SVG SMIL</div>`;
+        if (r.animations.scrollDriven) html += `<div style="color:#fb923c">Scroll-driven ⚠</div>`;
+        html += '</div></div>';
+
+        // Media
+        html += '<div style="margin-bottom:14px"><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Media & 3D</div>';
+        html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:4px;font-size:12px">';
+        html += `<div>${r.media.images} images</div>`;
+        html += `<div>${r.media.svgs} SVGs</div>`;
+        if (r.media.videos) html += `<div>${r.media.videos} vidéos</div>`;
+        if (r.media.canvases) html += `<div style="color:#fbbf24">${r.media.canvases} canvas</div>`;
+        if (r.media.webgl) html += `<div style="color:#fb923c">WebGL actif</div>`;
+        if (r.media.three) html += `<div style="color:#fb923c">${r.media.threeRenderer}</div>`;
+        if (r.media.iframes) html += `<div>${r.media.iframes} iframes</div>`;
+        html += '</div></div>';
+
+        // Structure
+        html += '<div style="margin-bottom:14px"><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Structure</div>';
+        html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:4px;font-size:12px">';
+        html += `<div>${r.structure.totalElements} éléments DOM</div>`;
+        html += `<div>Profondeur max: ${r.structure.maxDepth}</div>`;
+        html += `<div>${r.js.totalScripts} scripts (${r.js.externalScripts} ext)</div>`;
+        if (r.js.spa) html += `<div style="color:#fbbf24">SPA (Single Page App)</div>`;
+        if (r.structure.shadowDom) html += `<div style="color:#f87171">Shadow DOM ⚠</div>`;
+        if (r.structure.webComponents) html += `<div style="color:#fb923c">Web Components</div>`;
+        if (r.fonts.googleFonts) html += '<div>Google Fonts</div>';
+        if (r.fonts.adobeFonts) html += '<div>Adobe Fonts</div>';
+        if (r.fonts.iconFonts) html += '<div>Icon Fonts</div>';
+        if (r.fonts.customFonts.length) html += '<div>' + r.fonts.customFonts.slice(0, 5).join(", ") + '</div>';
+        html += '</div></div>';
+
+        // Issues
+        if (r.issues.length) {
+          html += '<div style="margin-bottom:14px"><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Problèmes détectés</div>';
+          r.issues.forEach(issue => {
+            const c = issue.severity === "high" ? "#f87171" : issue.severity === "medium" ? "#fbbf24" : "#94a3b8";
+            const icon = issue.severity === "high" ? "🔴" : issue.severity === "medium" ? "🟡" : "🔵";
+            html += `<div style="font-size:12px;padding:4px 0;border-bottom:1px solid var(--border);display:flex;gap:6px;align-items:start">
+              <span>${icon}</span>
+              <div><span style="color:${c}">${issue.text}</span><span style="font-size:10px;color:var(--muted);margin-left:6px">${issue.tech}</span></div>
+            </div>`;
+          });
+          html += '</div>';
+        }
+
+        // Tips
+        if (r.tips.length) {
+          html += '<div><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Conseils</div>';
+          r.tips.forEach(tip => {
+            html += `<div style="font-size:12px;padding:3px 0;color:#94a3b8">→ ${tip}</div>`;
+          });
+          html += '</div>';
+        }
+
+        panel.innerHTML = html;
+      } catch (err) {
+        panel.innerHTML = `<div style="color:var(--danger);text-align:center;padding:20px">Erreur : ${err.message}</div>`;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "🔍 Scan";
+      }
+    });
+
+    // ── Extract ──
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      let url = urlInput.value.trim();
+      if (!url) return;
+      if (!/^https?:\/\//i.test(url)) url = "https://" + url;
+      urlInput.value = url;
+      go.disabled = true;
+      revokeOld();
+      const isThorough = document.getElementById("thorough").checked;
+      const numPasses = Number(passesInput.value) || 1;
+      const sel = window.__pendingSelector || null;
+      setStatus(sel ? `Extraction [${sel}]…` : "Extraction…");
+
+      // Poll progress while extraction runs.
+      let progressIv = setInterval(async () => {
+        try {
+          const pr = await fetch("/api/progress");
+          const pj = await pr.json();
+          if (pj.active) {
+            const bar = pj.pct > 0 ? ` (${pj.pct}%)` : "";
+            setStatus(`${pj.step}${bar} ${pj.detail}`);
+          }
+        } catch (e) {}
+      }, 800);
+
+      try {
+        const resp = await fetch("/api/extract", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ url, thorough: isThorough, passes: numPasses, slowdown: readSlowdown(), viewport: getViewport(), selector: sel, fullClone: document.getElementById("fullClone").checked }),
+        });
+        clearInterval(progressIv);
+        const json = await resp.json();
+        if (!resp.ok || !json.ok) throw new Error(json.error || `HTTP ${resp.status}`);
+
+        // Full Clone: use the server-hosted clone URL instead of blob
+        if (json.cloneUrl) {
+          currentHtmlUrl = json.cloneUrl;
+        } else {
+          const htmlBlob = new Blob([json.html], { type: "text/html" });
+          currentHtmlUrl = URL.createObjectURL(htmlBlob);
+        }
+
+        // Preview
+        window.__proxyUrl = json.proxyUrl || null;
+        if (json.proxyUrl) {
+          preview.src = json.proxyUrl;
+          currentView = "proxy";
+          viewProxyBtn.classList.add("active");
+          viewReelBtn.classList.remove("active");
+          document.getElementById("openNew").href = json.proxyUrl;
+        } else {
+          preview.src = currentHtmlUrl;
+          currentView = "reel";
+          viewProxyBtn.classList.remove("active");
+          viewReelBtn.classList.add("active");
+          document.getElementById("openNew").href = currentHtmlUrl;
+        }
+        document.getElementById("dlHtml").href = currentHtmlUrl;
+
+        // Enter fullscreen
+        enterPreview();
+        document.getElementById("toolbarSize").textContent = `${Math.round(preview.offsetWidth)}×${Math.round(preview.offsetHeight)}`;
+        document.getElementById("drawerUrl").textContent = new URL(url).hostname;
+        document.getElementById("toolbarUrl").textContent = url;
+
+        // Stats
+        const s = json.stats || {};
+        const bits = [`${s.nodes} nodes`, `${s.rules} rules`, `${s.keyframes} kfs`];
+        if (s.sampled) bits.push(`${s.sampled} sampled`);
+        if (s.canvasCaptured) bits.push(`${s.canvasCaptured} canvas`);
+        if (json.proxyUrl) bits.push(`proxy ${json.proxyUrl}`);
+        bits.push(`${json.tookMs}ms`);
+        statsLine.textContent = bits.join(" · ");
+
+        // Tech
+        const t = json.tech;
+        if (t) {
+          const flags = [];
+          if (t.gsap) flags.push("GSAP");
+          if (t.framerMotion) flags.push("Framer");
+          if (t.react) flags.push("React");
+          if (t.vue) flags.push("Vue");
+          let h = flags.map(f => `<span class="badge">${f}</span>`).join("") || '<span class="badge">vanilla</span>';
+          if (t.warnings && t.warnings.length) h += ` <span class="warn">⚠ ${t.warnings.join(" · ")}</span>`;
+          techLine.innerHTML = h;
+        }
+
+        // Store for conversion/generation
+        window.__capturedHtml = json.html;
+        window.__designTokens = json.designTokens;
+        window.__reverseData = json.reverseData;
+        window.__capturedUrl = url;
+        window.__aiLabels = null;
+        domTreeBuilt = false;
+        restoreAiLabels();
+        renderReverseData(json.reverseData);
+        window.__pendingSelector = null;
+
+        // Tokens
+        renderTokens(json.designTokens);
+
+        // API hint
+        document.getElementById("apiHint").textContent = json.hasApiKey ? "Claude API connectée." : "ANTHROPIC_API_KEY non définie — conversion locale.";
+
+        // Auto-save to local catalogue
+        try {
+          await saveCapture({
+            url,
+            hostname: new URL(url).hostname,
+            html: json.html,
+            tokens: json.designTokens,
+            tech: json.tech,
+            stats: statsLine.textContent,
+            nodeCount: (json.stats || {}).nodes || 0,
+            cloneId: json.cloneUrl ? json.cloneUrl.split("/")[2] : null,
+            savedAt: Date.now(),
+          });
+          renderCatalogue();
+        } catch (e) {}
+
+        setStatus("");
+      } catch (err) {
+        clearInterval(progressIv);
+        setStatus("Erreur : " + err.message, true);
+      } finally {
+        go.disabled = false;
+      }
+    });
+
+    // ── Tabs ──
+    document.querySelectorAll(".tab-bar button").forEach(btn => {
+      btn.addEventListener("click", () => {
+        btn.closest(".tab-bar").querySelectorAll("button").forEach(b => b.classList.toggle("active", b === btn));
+        const panels = btn.closest(".section").querySelectorAll(".tab-panel");
+        panels.forEach(p => p.classList.toggle("active", p.dataset.tab === btn.dataset.tab));
+      });
+    });
+
+    // ── Sections collector ──
+    const sidePanel = document.getElementById("sidePanel");
+    const sectionList = document.getElementById("sectionList");
+    const sectionCount = document.getElementById("sectionCount");
+    let collectedSections = [];
+
+    // Proxy / Réel toggle
+    const viewProxyBtn = document.getElementById("viewProxy");
+    const viewReelBtn = document.getElementById("viewReel");
+    let currentView = "proxy";
+    function setView(mode) {
+      const proxyAvail = !!window.__proxyUrl;
+      const reelAvail = !!currentHtmlUrl;
+      if (mode === "proxy") {
+        if (proxyAvail) {
+          preview.src = window.__proxyUrl;
+          currentView = "proxy";
+          requestProxyDom();
+        } else if (window.__capturedUrl) {
+          // Auto-start proxy
+          showToast("Lancement du proxy...");
+          fetch("/api/proxy", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ url: window.__capturedUrl }) })
+            .then(r => r.json())
+            .then(json => {
+              if (json.ok && json.proxyUrl) {
+                window.__proxyUrl = json.proxyUrl;
+                setView("proxy");
+                requestProxyDom();
+              } else {
+                showToast("Proxy impossible");
+              }
+            })
+            .catch(() => showToast("Erreur proxy"));
+          return;
+        }
+      } else {
+        if (reelAvail) {
+          preview.src = currentHtmlUrl;
+          currentView = "reel";
+          domTreeBuilt = false;
+          buildDomTree();
+        } else {
+          showToast("Pas de capture disponible");
+          return;
+        }
+      }
+      viewProxyBtn.classList.toggle("active", currentView === "proxy");
+      viewReelBtn.classList.toggle("active", currentView === "reel");
+    }
+    viewProxyBtn.addEventListener("click", () => {
+      setView("proxy");
+      domTreeBuilt = false;
+      requestProxyDom();
+    });
+    viewReelBtn.addEventListener("click", () => {
+      setView("reel");
+      domTreeBuilt = false;
+      buildDomTree();
+    });
+
+    // Request live DOM from proxy after switching
+    function requestProxyDom() {
+      var attempts = 0;
+      function tryIt() {
+        try { preview.contentWindow.postMessage({ type: "mx-get-dom" }, "*"); } catch(e) {}
+        attempts++;
+        if (!domTreeBuilt && attempts < 6 && currentView === "proxy") {
+          setTimeout(tryIt, 2000);
+        }
+      }
+      setTimeout(tryIt, 1000);
+    }
+
+    // Side panel tabs
+    document.querySelectorAll(".side-panel-tabs button").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".side-panel-tabs button").forEach(b => b.classList.toggle("active", b === btn));
+        document.querySelectorAll(".side-panel-view").forEach(v => v.classList.toggle("active", v.dataset.view === btn.dataset.view));
+        if (btn.dataset.view === "dom" && !domTreeBuilt) buildDomTree();
+      });
+    });
+
+    // All iframe communication via postMessage — works for both proxy and blob
+    function gotoInIframe(selector, nthPath, persist, dataPath) {
+      try {
+        // If we have a data-path (from AI labels / tree indexing) AND we're
+        // viewing the proxy, use mx-goto-path which walks the live DOM by
+        // child index — much more reliable than CSS selectors.
+        if (persist && dataPath && currentView === "proxy") {
+          preview.contentWindow.postMessage({ type: "mx-goto-path", path: dataPath }, "*");
+          return;
+        }
+        preview.contentWindow.postMessage({ type: persist ? "mx-goto" : "mx-highlight", selector, nthPath }, "*");
+      } catch(e) {}
+    }
+    function clearIframeHighlight() {
+      try {
+        preview.contentWindow.postMessage({ type: "mx-highlight", selector: null }, "*");
+      } catch(e) {}
+    }
+
+    // Render DOM tree like Chrome DevTools: <tag class="..." id="...">
+    function htmlSpan(cls, text) {
+      const s = document.createElement("span");
+      s.className = cls;
+      s.textContent = text;
+      return s;
+    }
+    function shortenCls(cls) {
+      if (!cls) return "";
+      return cls.split(/\s+/).map(c => /^[a-zA-Z0-9_-]{20,}$/.test(c) || /^(css|c15t|sc)-/.test(c) ? c.slice(0, 12) + "…" : c).slice(0, 6).join(" ");
+    }
+    function buildOpenTag(n) {
+      const frag = document.createDocumentFragment();
+      frag.appendChild(htmlSpan("bracket", "<"));
+      frag.appendChild(htmlSpan("tag", n.tag));
+      if (n.id) {
+        frag.appendChild(document.createTextNode(" "));
+        frag.appendChild(htmlSpan("attr-name", "id"));
+        frag.appendChild(htmlSpan("bracket", '="'));
+        frag.appendChild(htmlSpan("attr-id", n.id));
+        frag.appendChild(htmlSpan("bracket", '"'));
+      }
+      if (n.cls) {
+        frag.appendChild(document.createTextNode(" "));
+        frag.appendChild(htmlSpan("attr-name", "class"));
+        frag.appendChild(htmlSpan("bracket", '="'));
+        frag.appendChild(htmlSpan("attr-val", shortenCls(n.cls)));
+        frag.appendChild(htmlSpan("bracket", '"'));
+      }
+      frag.appendChild(htmlSpan("bracket", ">"));
+      return frag;
+    }
+
+    function renderJsonNode(n, depth, path) {
+      if (!n || depth > 12) return document.createDocumentFragment();
+      path = path || "0";
+      const el = document.createElement("div");
+      let hasKids = n.children && n.children.length > 0;
+      const line = document.createElement("div");
+      line.className = "dom-node" + (n.hidden ? " ghost" : "");
+      line.setAttribute("data-path", path);
+      if (n.hidden) {
+        const reason = (n.w === 0 && n.h === 0) ? "0×0" : "hidden";
+        line.setAttribute("data-reason", reason);
+      }
+      const toggle = document.createElement("span");
+      toggle.className = "toggle";
+      toggle.textContent = hasKids ? "▸" : "";
+      line.appendChild(toggle);
+      line.appendChild(buildOpenTag(n));
+      if (!hasKids) {
+        line.appendChild(htmlSpan("close-tag", "</" + n.tag + ">"));
+      } else {
+        line.appendChild(htmlSpan("dots", "…"));
+        line.appendChild(htmlSpan("close-tag", "</" + n.tag + ">"));
+      }
+      // AI label
+      if (window.__aiLabels && window.__aiLabels[path]) {
+        const lbl = window.__aiLabels[path];
+        const lblType = /nav|header|menu/i.test(lbl) ? "nav" : /hero|banner/i.test(lbl) ? "hero" : /footer/i.test(lbl) ? "footer" : /cta|button/i.test(lbl) ? "cta" : /video|canvas|image|gallery/i.test(lbl) ? "img" : /form|contact/i.test(lbl) ? "form" : "section";
+        const badge = document.createElement("span");
+        badge.className = "label-badge ai-label " + lblType;
+        badge.textContent = lbl;
+        line.appendChild(badge);
+      }
+      // Text preview
+      if (domSmart && n.text && !hasKids) {
+        const tp = document.createElement("span");
+        tp.style.cssText = "font-size:9px;color:#666;margin-left:6px;font-style:italic";
+        tp.textContent = n.text.slice(0, 30);
+        line.appendChild(tp);
+      }
+      // Size badge for visible elements
+      if (n.w !== undefined && !n.hidden && n.w > 0) {
+        const sz = document.createElement("span");
+        sz.style.cssText = "font-size:9px;color:#555;margin-left:6px";
+        sz.textContent = n.w + "×" + n.h;
+        line.appendChild(sz);
+      }
+
+      const selector = n.tag + (n.id ? "#" + n.id : "") + (n.cls ? "." + n.cls.split(" ").slice(0, 2).join(".") : "");
+      line.addEventListener("click", (e) => {
+        e.stopPropagation();
+        // Don't navigate if clicking the toggle arrow
+        if (e.target.classList.contains("toggle")) return;
+        document.querySelectorAll(".dom-node.selected").forEach(x => x.classList.remove("selected"));
+        line.classList.add("selected");
+        gotoInIframe(selector, null, true, path);
+      });
+      line.addEventListener("mouseenter", () => {
+        if (currentView === "proxy" && path) {
+          try { preview.contentWindow.postMessage({ type: "mx-highlight-path", path }, "*"); } catch(e) {}
+        } else {
+          gotoInIframe(selector, null, false);
+        }
+      });
+      line.addEventListener("mouseleave", () => clearIframeHighlight());
+      line.addEventListener("contextmenu", (e) => {
+        e.preventDefault(); e.stopPropagation();
+        showContextMenu(e.clientX, e.clientY, { tag: n.tag, cls: n.cls, selector, nthPath: null, html: "", path: path });
+      });
+
+      el.appendChild(line);
+      if (hasKids) {
+        const cc = document.createElement("div");
+        cc.className = "dom-children" + (depth >= 2 ? " collapsed" : "");
+        if (depth < 2) toggle.textContent = "▾";
+        n.children.forEach((c, ci) => cc.appendChild(renderJsonNode(c, depth + 1, path + "." + ci)));
+        // Closing tag on its own line
+        const closeLine = document.createElement("div");
+        closeLine.className = "dom-node";
+        closeLine.appendChild(htmlSpan("close-tag", "</" + n.tag + ">"));
+        cc.appendChild(closeLine);
+        el.appendChild(cc);
+        toggle.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const collapsed = cc.classList.toggle("collapsed");
+          toggle.textContent = collapsed ? "▸" : "▾";
+          // Show/hide inline dots + closing tag
+          line.querySelector(".dots").style.display = collapsed ? "" : "none";
+          line.querySelector(".close-tag").style.display = collapsed ? "" : "none";
+        });
+        // If auto-expanded, hide inline dots
+        if (depth < 2) {
+          const d = line.querySelector(".dots"); if (d) d.style.display = "none";
+          const c = line.querySelector(".close-tag"); if (c) c.style.display = "none";
+        }
+      }
+      return el;
+    }
+
+    // ── Smart DOM: clean, label, collapse ──
+    let domSmart = true;
+    function afterTreeRebuild() {
+      if (window.__aiLabels && Object.keys(window.__aiLabels).length > 0) {
+        document.getElementById("labeledOnlyWrap").style.display = "flex";
+        markLabeledNodes();
+        document.getElementById("domTreeContent").classList.toggle("labeled-only", document.getElementById("labeledOnly").checked);
+      }
+    }
+    document.getElementById("domModeRaw").addEventListener("click", () => {
+      domSmart = false;
+      document.getElementById("domModeRaw").classList.add("active");
+      document.getElementById("domModeSmart").classList.remove("active");
+      document.getElementById("domModeAI").classList.remove("active");
+      domTreeBuilt = false;
+      if (currentView === "proxy") requestProxyDom();
+      else buildDomTree();
+      setTimeout(afterTreeRebuild, 200);
+    });
+    document.getElementById("domModeSmart").addEventListener("click", () => {
+      domSmart = true;
+      document.getElementById("domModeSmart").classList.add("active");
+      document.getElementById("domModeRaw").classList.remove("active");
+      document.getElementById("domModeAI").classList.remove("active");
+      domTreeBuilt = false;
+      if (currentView === "proxy") requestProxyDom();
+      else buildDomTree();
+      setTimeout(afterTreeRebuild, 200);
+    });
+
+    // AI Label mode — generates prompt for user to paste into Claude manually
+    document.getElementById("domModeAI").addEventListener("click", () => {
+      const btn = document.getElementById("domModeAI");
+      btn.classList.add("active");
+      document.getElementById("domModeRaw").classList.remove("active");
+      document.getElementById("domModeSmart").classList.remove("active");
+      domSmart = false;
+
+      // If labels already exist, just apply them — don't show prompt
+      if (window.__aiLabels && Object.keys(window.__aiLabels).length > 0) {
+        domTreeBuilt = false;
+        const container = document.getElementById("domTreeContent");
+        if (window.__lastProxyTree) {
+          container.innerHTML = "";
+          container.appendChild(renderJsonNode(window.__lastProxyTree, 0, "0"));
+        } else { buildDomTree(); }
+        document.getElementById("labeledOnlyWrap").style.display = "flex";
+        markLabeledNodes();
+        document.getElementById("labeledOnly").checked = true;
+        container.classList.add("labeled-only");
+        showToast(Object.keys(window.__aiLabels).length + " labels appliqués");
+        return;
+      }
+
+      // Build compact tree text — filters noise, includes useful context
+      function treeToText(n, path, depth) {
+        if (!n || depth > 8) return "";
+        // Skip SVG sprites, hidden elements, tiny decorative stuff
+        if (n.tag === "svg" && depth > 1) return "";
+        if (n.hidden && depth > 2) return "";
+        if (n.w !== undefined && n.w < 5 && n.h !== undefined && n.h < 5 && depth > 3) return "";
+        const indent = "  ".repeat(depth);
+        const id = n.id ? `#${n.id}` : "";
+        const size = (n.w && n.h) ? ` [${n.w}×${n.h}]` : "";
+        const text = n.text ? ` "${n.text.slice(0, 40)}"` : "";
+        let line = `${indent}${path} <${n.tag}${id}>${size}${text}\n`;
+        if (n.children) n.children.forEach((c, i) => { line += treeToText(c, path + "." + i, depth + 1); });
+        return line;
+      }
+      function domToCompact(node, path, depth) {
+        if (node.nodeType !== 1 || depth > 8) return "";
+        const tag = node.tagName.toLowerCase();
+        if (["script","style","link","meta","noscript","template","svg"].includes(tag) && depth > 1) return "";
+        const indent = "  ".repeat(depth);
+        const id = node.id ? `#${node.id}` : "";
+        const text = node.textContent.trim().slice(0, 40).replace(/\s+/g, " ");
+        let line = `${indent}${path} <${tag}${id}>${text ? ` "${text}"` : ""}\n`;
+        let ci = 0;
+        for (const child of node.children) { line += domToCompact(child, path + "." + ci, depth + 1); ci++; }
+        return line;
+      }
+
+      let treeText = "";
+      if (window.__lastProxyTree) treeText = treeToText(window.__lastProxyTree, "0", 0);
+      else if (window.__capturedHtml) {
+        const doc = new DOMParser().parseFromString(window.__capturedHtml, "text/html");
+        treeText = domToCompact(doc.body, "0", 0);
+      }
+      if (!treeText) { document.getElementById("domTreeContent").innerHTML = '<p style="color:var(--danger);font-size:12px;padding:16px">Pas de DOM.</p>'; return; }
+
+      const prompt = `You are analyzing a webpage's DOM tree to identify its sections. Each node shows: path, tag, id, classes, size [WxH], and text preview.
+
+RULES:
+- Return a JSON object: { "path": "Label" }
+- Label ONLY meaningful sections (Hero, Nav, Features, Pricing, FAQ, Footer, CTA, Cards, Gallery, Form, Testimonials, etc.)
+- Skip generic wrapper divs — only label nodes that represent a real UI section
+- Use short, descriptive labels (2-4 words max)
+- For feature sections, include the feature name if visible in text (e.g. "Feature — Launch", "Feature — Pricing")
+- Ignore SVG sprite containers, hidden elements, tiny decorative elements
+- A section with a large height (>400px) containing an H1 is likely the Hero
+- Multiple similar siblings are likely Cards or a Grid
+- Elements near the bottom with links are the Footer
+- Output ONLY valid JSON, no markdown, no explanation
+
+DOM tree:
+${treeText.slice(0, 15000)}`;
+
+      // Show prompt + paste area
+      const container = document.getElementById("domTreeContent");
+      container.innerHTML = `
+        <div style="padding:12px">
+          <p style="font-size:12px;color:var(--fg);margin-bottom:8px;font-weight:600">1. Copie ce prompt et colle-le dans Claude :</p>
+          <textarea style="width:100%;height:120px;background:#0d0e12;color:#c5cad3;border:1px solid var(--border);border-radius:8px;padding:8px;font-size:10px;font-family:monospace;resize:vertical" readonly>${prompt.replace(/</g,"&lt;")}</textarea>
+          <button onclick="navigator.clipboard.writeText(this.previousElementSibling.value);this.textContent='Copié !'" style="margin-top:6px;background:var(--accent);color:#0b0c0f;border:none;padding:5px 14px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600">Copier le prompt</button>
+          <p style="font-size:12px;color:var(--fg);margin:12px 0 8px;font-weight:600">2. Colle la réponse JSON de Claude ici :</p>
+          <textarea id="aiResponseInput" style="width:100%;height:80px;background:#0d0e12;color:#c5cad3;border:1px solid var(--border);border-radius:8px;padding:8px;font-size:10px;font-family:monospace;resize:vertical" placeholder='{"0.1": "Hero Section", "0.2": "Features", ...}'></textarea>
+          <button id="applyAiLabels" style="margin-top:6px;background:var(--accent);color:#0b0c0f;border:none;padding:5px 14px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600">Appliquer les labels</button>
+        </div>`;
+      document.getElementById("applyAiLabels").addEventListener("click", () => {
+        try {
+          const raw = document.getElementById("aiResponseInput").value.trim();
+          const match = raw.match(/\{[\s\S]*\}/);
+          if (!match) throw new Error("Pas de JSON trouvé");
+          const labels = JSON.parse(match[0]);
+          window.__aiLabels = labels;
+          try { localStorage.setItem("mx-ai-labels", JSON.stringify({ url: window.__capturedUrl, labels })); } catch(e) {}
+          // Rebuild tree — labels applied during render via __aiLabels
+          domTreeBuilt = false;
+          domSmart = false;
+          document.getElementById("domModeRaw").classList.add("active");
+          document.getElementById("domModeSmart").classList.remove("active");
+          if (window.__lastProxyTree) {
+            container.innerHTML = "";
+            container.appendChild(renderJsonNode(window.__lastProxyTree, 0, "0"));
+          } else { buildDomTree(); }
+          // Show checkbox + mark nodes
+          document.getElementById("labeledOnlyWrap").style.display = "flex";
+          markLabeledNodes();
+          showToast(Object.keys(labels).length + " labels appliqués");
+        } catch(err) { showToast("Erreur JSON: " + err.message); }
+      });
+    });
+
+    // Content-based label detection — works on real DOM nodes (DOMParser) or JSON
+    function detectLabel(n) {
+      const tag = (n.tag || (n.tagName || "").toLowerCase() || "").toLowerCase();
+      const cls = (n.cls || (typeof n.className === "string" ? n.className : "") || "").toLowerCase();
+      const id = (n.id || "").toLowerCase();
+      const all = tag + " " + cls + " " + id;
+
+      // Semantic tags first
+      if (tag === "nav") return { text: "Navigation", type: "nav" };
+      if (tag === "header") return { text: "Header", type: "nav" };
+      if (tag === "footer") return { text: "Footer", type: "footer" };
+      if (tag === "main") return { text: "Main", type: "section" };
+      if (tag === "video") return { text: "Video", type: "img" };
+      if (tag === "canvas") return { text: "Canvas", type: "img" };
+      if (tag === "img" || tag === "picture") return { text: "Image", type: "img" };
+      if (tag === "form") return { text: "Form", type: "form" };
+      if (tag === "button") return { text: "Button", type: "cta" };
+      if (/^h[1-6]$/.test(tag)) return { text: tag.toUpperCase(), type: "hero" };
+
+      // Class/id based
+      if (/hero|banner|jumbotron/.test(all)) return { text: "Hero", type: "hero" };
+      if (/pricing|price|plans?/.test(all)) return { text: "Pricing", type: "section" };
+      if (/testimonial|review/.test(all)) return { text: "Testimonials", type: "section" };
+      if (/feature|benefit/.test(all)) return { text: "Features", type: "section" };
+      if (/faq|accordion/.test(all)) return { text: "FAQ", type: "section" };
+      if (/cta|signup/.test(all)) return { text: "CTA", type: "cta" };
+      if (/logo/.test(all)) return { text: "Logo", type: "img" };
+      if (/\bnav\b/.test(cls)) return { text: "Nav", type: "nav" };
+
+      // Content-based: analyze children (works for both DOM nodes and JSON)
+      const isNode = !!n.querySelector;
+      if (isNode) {
+        const text = (n.textContent || "").trim().slice(0, 100).toLowerCase();
+        if (n.querySelector("h1") && n.children.length <= 10) return { text: "Hero", type: "hero" };
+        if (n.querySelector("video")) return { text: "Video Section", type: "img" };
+        if (n.querySelector("canvas")) return { text: "Canvas Section", type: "img" };
+        if (n.querySelector("form") || n.querySelector("input")) return { text: "Form", type: "form" };
+        if (n.querySelectorAll("a").length > 3 && !n.querySelector("h2")) return { text: "Navigation", type: "nav" };
+        if (n.querySelector("h2") && n.children.length >= 3) return { text: "Content Section", type: "section" };
+        if (n.querySelector("h3") && n.children.length >= 3) return { text: "Cards", type: "section" };
+        if (n.querySelectorAll("img").length >= 3) return { text: "Gallery", type: "img" };
+        if (n.querySelector("button") && !n.querySelector("h2")) return { text: "CTA", type: "cta" };
+        if (/pric|\$|€|\/mo/.test(text)) return { text: "Pricing", type: "section" };
+        if (/faq|question/.test(text)) return { text: "FAQ", type: "section" };
+        if (/testimoni|review|avis/.test(text)) return { text: "Testimonials", type: "section" };
+      }
+
+      if (tag === "section" || tag === "article") return { text: "Section", type: "section" };
+      return null;
+    }
+
+    function cleanTree(n) {
+      if (!n) return null;
+      // Skip hidden/0-size
+      if (n.hidden) return null;
+      // Process children
+      let kids = (n.children || []).map(c => cleanTree(c)).filter(Boolean);
+      // Collapse single-child wrapper divs
+      while (n.tag === "div" && kids.length === 1 && kids[0].tag === "div" && !n.id && !detectLabel(n)) {
+        n = { ...kids[0], cls: n.cls || kids[0].cls };
+        kids = (n.children || []).map(c => cleanTree(c)).filter(Boolean);
+      }
+      // Skip empty wrapper divs with no label
+      if (n.tag === "div" && kids.length === 0 && !n.id && !detectLabel(n) && !n.cls) return null;
+      return { ...n, children: kids };
+    }
+
+    function markLabeledNodes() {
+      const tree = document.getElementById("domTreeContent");
+      if (!tree) return;
+      tree.querySelectorAll(".dom-node").forEach(n => { n.classList.remove("is-labeled", "is-ancestor"); });
+      // Mark labeled nodes
+      tree.querySelectorAll(".label-badge.ai-label").forEach(badge => {
+        const node = badge.closest(".dom-node");
+        if (node) node.classList.add("is-labeled");
+      });
+      // Mark ancestors — walk UP from each labeled node
+      tree.querySelectorAll(".is-labeled").forEach(labeled => {
+        let el = labeled.parentElement;
+        while (el && el !== tree) {
+          if (el.classList) {
+            if (el.classList.contains("dom-node")) el.classList.add("is-ancestor");
+            // Ensure dom-children containers on the path are visible
+            if (el.classList.contains("dom-children")) el.classList.remove("collapsed");
+          }
+          el = el.parentElement;
+        }
+        // Ensure the toggle shows expanded for ancestors
+        tree.querySelectorAll(".is-ancestor").forEach(anc => {
+          const toggle = anc.querySelector(".toggle");
+          if (toggle && toggle.textContent === "▸") toggle.textContent = "▾";
+        });
+      });
+    }
+
+    document.getElementById("hideClasses").addEventListener("change", (e) => {
+      document.getElementById("domTreeContent").classList.toggle("hide-classes", e.target.checked);
+    });
+    document.getElementById("labeledOnly").addEventListener("change", (e) => {
+      const tree = document.getElementById("domTreeContent");
+      tree.classList.toggle("labeled-only", e.target.checked);
+      if (e.target.checked) markLabeledNodes();
+    });
+
+    // Restore AI labels from localStorage (only if same URL)
+    function restoreAiLabels() {
+      try {
+        const saved = localStorage.getItem("mx-ai-labels");
+        if (!saved) return;
+        const data = JSON.parse(saved);
+        if (data.url && data.labels) {
+          // If no capturedUrl yet (page reload), accept any saved labels
+          if (!window.__capturedUrl || data.url === window.__capturedUrl) {
+            window.__aiLabels = data.labels;
+            window.__capturedUrl = window.__capturedUrl || data.url;
+            document.getElementById("labeledOnlyWrap").style.display = "flex";
+          }
+        }
+      } catch(e) {}
+    }
+
+    // Restore on page load
+    restoreAiLabels();
+
+    let domTreeBuilt = false;
+    function buildDomTree() {
+      const container = document.getElementById("domTreeContent");
+      if (!window.__capturedHtml) {
+        container.innerHTML = '<p style="color:var(--muted);padding:20px;font-size:12px">Aucune capture. Lance un Extract d\'abord.</p>';
+        return;
+      }
+      domTreeBuilt = true;
+      try {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(window.__capturedHtml, "text/html");
+        container.innerHTML = "";
+        const tree = renderNode(doc.body, 0);
+        if (tree.childNodes.length === 0) {
+          container.innerHTML = '<p style="color:var(--muted);padding:20px;font-size:12px">Aucun élément visuel trouvé dans le DOM.</p>';
+        } else {
+          container.appendChild(tree);
+        }
+        afterTreeRebuild();
+      } catch(e) {
+        container.innerHTML = '<p style="color:var(--danger);padding:20px;font-size:12px">Erreur parsing DOM: ' + e.message + '</p>';
+      }
+    }
+    const SKIP_TAGS = new Set(["script","noscript","style","link","meta","base","template","iframe"]);
+    const SKIP_IDS = new Set(["svg-templates","__next-route-announcer__"]);
+    function renderNode(node, depth, path) {
+      path = path || "0";
+      if (node.nodeType !== 1) return document.createDocumentFragment();
+      if (depth > 12) return document.createDocumentFragment();
+      const tag = node.tagName.toLowerCase();
+      // Skip non-visual elements
+      if (SKIP_TAGS.has(tag)) return document.createDocumentFragment();
+      // Skip SVG symbol containers (huge, not visual content)
+      if (tag === "svg" && node.children.length > 3 && node.querySelector("symbol")) return document.createDocumentFragment();
+      // Skip hidden elements
+      if (SKIP_IDS.has(node.id)) return document.createDocumentFragment();
+      if (node.getAttribute("hidden") !== null) return document.createDocumentFragment();
+      const el = document.createElement("div");
+      const children = Array.from(node.children);
+      let hasKids = children.length > 0;
+      const nodeId = node.id || "";
+      const nodeCls = (typeof node.className === "string" ? node.className.trim() : "");
+      // Shorten hash-style classes (css-abc123, c15t-ui-root-hE9Kz)
+      const shortCls = nodeCls.split(/\s+/).map(c => /^[a-zA-Z0-9_-]{20,}$/.test(c) || /^(css|c15t|sc)-/.test(c) ? c.slice(0, 12) + "…" : c).slice(0, 6).join(" ");
+
+      const line = document.createElement("div");
+      line.className = "dom-node";
+      line.setAttribute("data-path", path);
+      const toggle = document.createElement("span");
+      toggle.className = "toggle";
+      toggle.textContent = hasKids ? "▸" : "";
+      line.appendChild(toggle);
+      // DevTools format: <tag class="..." id="...">
+      line.appendChild(htmlSpan("bracket", "<"));
+      line.appendChild(htmlSpan("tag", tag));
+      if (nodeId) {
+        line.appendChild(document.createTextNode(" "));
+        line.appendChild(htmlSpan("attr-name", "id"));
+        line.appendChild(htmlSpan("bracket", '="'));
+        line.appendChild(htmlSpan("attr-id", nodeId));
+        line.appendChild(htmlSpan("bracket", '"'));
+      }
+      if (shortCls) {
+        line.appendChild(document.createTextNode(" "));
+        line.appendChild(htmlSpan("attr-name", "class"));
+        line.appendChild(htmlSpan("bracket", '="'));
+        line.appendChild(htmlSpan("attr-val", shortCls));
+        line.appendChild(htmlSpan("bracket", '"'));
+      }
+      line.appendChild(htmlSpan("bracket", ">"));
+      if (!hasKids) {
+        line.appendChild(htmlSpan("close-tag", "</" + tag + ">"));
+      } else {
+        line.appendChild(htmlSpan("dots", "…"));
+        line.appendChild(htmlSpan("close-tag", "</" + tag + ">"));
+      }
+      el.appendChild(line);
+
+      // Children container
+      let childContainer = null;
+      if (hasKids) {
+        childContainer = document.createElement("div");
+        childContainer.className = "dom-children collapsed";
+        let rendered = 0;
+        for (const child of children) {
+          if (rendered >= 50) break;
+          const r = renderNode(child, depth + 1, path + "." + rendered);
+          if (r.childNodes.length > 0) { childContainer.appendChild(r); rendered++; }
+        }
+        if (rendered === 0) { hasKids = false; toggle.textContent = ""; }
+        if (children.length > 50 && rendered >= 50) {
+          const more = document.createElement("div");
+          more.className = "dom-node";
+          more.style.color = "var(--muted)";
+          more.textContent = `  ... +${children.length - 50} more`;
+          childContainer.appendChild(more);
+        }
+        el.appendChild(childContainer);
+        // Auto-expand first 2 levels
+        if (depth < 2) {
+          childContainer.classList.remove("collapsed");
+          toggle.textContent = "▾";
+          const d = line.querySelector(".dots"); if (d) d.style.display = "none";
+          const c = line.querySelector(".close-tag"); if (c) c.style.display = "none";
+        }
+      }
+
+      // Toggle expand/collapse
+      toggle.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (!childContainer) return;
+        const collapsed = childContainer.classList.toggle("collapsed");
+        toggle.textContent = collapsed ? "▸" : "▾";
+        const d = line.querySelector(".dots"); if (d) d.style.display = collapsed ? "" : "none";
+        const c = line.querySelector(".close-tag"); if (c) c.style.display = collapsed ? "" : "none";
+      });
+
+      const nodeData = { tag: node.tagName.toLowerCase(), cls: node.className || "", selector: buildSelector(node), nthPath: buildNthPath(node), html: node.outerHTML, path: path };
+
+      // AI label
+      if (window.__aiLabels && window.__aiLabels[path]) {
+        const lbl = window.__aiLabels[path];
+        const lblType = /nav|header|menu/i.test(lbl) ? "nav" : /hero|banner/i.test(lbl) ? "hero" : /footer/i.test(lbl) ? "footer" : /cta|button/i.test(lbl) ? "cta" : /video|canvas|image|gallery/i.test(lbl) ? "img" : /form|contact/i.test(lbl) ? "form" : "section";
+        const badge = document.createElement("span");
+        badge.className = "label-badge ai-label " + lblType;
+        badge.textContent = lbl;
+        line.appendChild(badge);
+      }
+      // Text preview for leaf nodes
+      if (domSmart && !hasKids && node.textContent) {
+        const txt = node.textContent.trim().slice(0, 30);
+        if (txt) {
+          const tp = document.createElement("span");
+          tp.style.cssText = "font-size:9px;color:#666;margin-left:6px;font-style:italic";
+          tp.textContent = txt;
+          line.appendChild(tp);
+        }
+      }
+
+      // Eye button (hide/show)
+      const visBtn = document.createElement("button");
+      visBtn.className = "vis-btn";
+      visBtn.textContent = "👁";
+      visBtn.title = "Masquer/afficher";
+      let isHidden = false;
+      visBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        isHidden = !isHidden;
+        visBtn.classList.toggle("hidden-el", isHidden);
+        visBtn.textContent = isHidden ? "👁‍🗨" : "👁";
+        el.style.opacity = isHidden ? "0.35" : "";
+        try {
+          preview.contentWindow.postMessage({
+            type: "mx-toggle-vis",
+            selector: nodeData.selector,
+            nthPath: nodeData.nthPath,
+            hidden: isHidden
+          }, "*");
+        } catch(ex) {}
+      });
+      line.appendChild(visBtn);
+
+      // Drag & drop reorder
+      line.setAttribute("draggable", "true");
+      line.addEventListener("dragstart", (e) => {
+        e.stopPropagation();
+        line.classList.add("dragging-dom");
+        e.dataTransfer.setData("text/plain", JSON.stringify({ selector: nodeData.selector, nthPath: nodeData.nthPath }));
+        e.dataTransfer.effectAllowed = "move";
+      });
+      line.addEventListener("dragend", () => line.classList.remove("dragging-dom"));
+      line.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        line.classList.add("drag-over");
+      });
+      line.addEventListener("dragleave", () => line.classList.remove("drag-over"));
+      line.addEventListener("drop", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        line.classList.remove("drag-over");
+        try {
+          const src = JSON.parse(e.dataTransfer.getData("text/plain"));
+          preview.contentWindow.postMessage({
+            type: "mx-reorder",
+            srcSelector: src.selector,
+            srcNthPath: src.nthPath,
+            destSelector: nodeData.selector,
+            destNthPath: nodeData.nthPath,
+          }, "*");
+          // Rebuild DOM tree after reorder
+          domTreeBuilt = false;
+          setTimeout(() => buildDomTree(), 300);
+        } catch(ex) {}
+      });
+
+      // Click → scroll to element + persistent highlight (direct DOM access)
+      line.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (e.target.classList.contains("toggle")) return;
+        document.querySelectorAll(".dom-node.selected").forEach(n => n.classList.remove("selected"));
+        line.classList.add("selected");
+        gotoInIframe(nodeData.selector, nodeData.nthPath, true, path);
+      });
+
+      // Hover → light highlight
+      line.addEventListener("mouseenter", () => {
+        if (currentView === "proxy" && path) {
+          try { preview.contentWindow.postMessage({ type: "mx-highlight-path", path }, "*"); } catch(e) {}
+        } else {
+          gotoInIframe(nodeData.selector, nodeData.nthPath, false);
+        }
+      });
+      line.addEventListener("mouseleave", () => clearIframeHighlight());
+
+      // Right-click → context menu
+      line.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        showContextMenu(e.clientX, e.clientY, nodeData);
+      });
+
+      return el;
+    }
+    function buildSelector(node) {
+      if (!node || node === document.body) return "body";
+      const segs = [];
+      let cur = node;
+      for (let d = 0; cur && cur.tagName && cur.tagName !== "HTML" && cur.tagName !== "BODY" && d < 10; d++) {
+        let seg = cur.tagName.toLowerCase();
+        if (cur.id) { seg += "#" + cur.id; segs.unshift(seg); break; }
+        if (cur.className && typeof cur.className === "string") {
+          const cls = cur.className.trim().split(/\s+/).filter(Boolean).slice(0, 2).join(".");
+          if (cls) seg += "." + cls;
+        }
+        segs.unshift(seg);
+        cur = cur.parentElement;
+      }
+      return segs.join(" > ");
+    }
+    // Nth-child based path (more reliable, no class dependency)
+    function buildNthPath(node) {
+      if (!node || node === document.body) return "body";
+      const segs = [];
+      let cur = node;
+      for (let d = 0; cur && cur.tagName && cur.tagName !== "HTML" && cur.tagName !== "BODY" && d < 15; d++) {
+        let seg = cur.tagName.toLowerCase();
+        const parent = cur.parentElement;
+        if (parent) {
+          const idx = Array.from(parent.children).indexOf(cur) + 1;
+          seg += ":nth-child(" + idx + ")";
+        }
+        segs.unshift(seg);
+        cur = parent;
+      }
+      return "body > " + segs.join(" > ");
+    }
+
+    // ── Animation timeline ──
+    const animPanel = document.getElementById("animPanel");
+    const animScrub = document.getElementById("animScrub");
+    const animTime = document.getElementById("animTime");
+    const animTracks = document.getElementById("animTracks");
+    let animData = [];
+    let animMaxTime = 5000;
+    let animPlaying = false;
+    let animRafId = null;
+    let animStartWall = 0;
+    let animStartTime = 0;
+
+    document.getElementById("toolAnim").addEventListener("click", () => {
+      animPanel.classList.toggle("open");
+      if (!animPanel.classList.contains("open")) {
+        // Closing: stop playback, restore previous view
+        animPlaying = false;
+        if (animRafId) { cancelAnimationFrame(animRafId); animRafId = null; }
+        if (window.__proxyUrl) {
+          preview.src = window.__proxyUrl;
+        } else if (currentHtmlUrl) {
+          preview.src = currentHtmlUrl;
+        }
+        return;
+      }
+      if (currentHtmlUrl) {
+        // Switch to captured HTML (deterministic — always same animations)
+        preview.src = currentHtmlUrl;
+        preview.onload = () => {
+          try { preview.contentWindow.postMessage({ type: "mx-anim-init" }, "*"); } catch(e) {}
+          preview.onload = null;
+        };
+      }
+    });
+
+    window.addEventListener("message", (e) => {
+      // Live DOM from proxy
+      if (e.data && e.data.type === "mx-dom-data" && e.data.tree) {
+        // Only rebuild if not already built (avoid destroying user's expanded state)
+        if (domTreeBuilt) return;
+        window.__lastProxyTree = e.data.tree;
+        const container = document.getElementById("domTreeContent");
+        container.innerHTML = "";
+        const tree = domSmart ? cleanTree(e.data.tree) : e.data.tree;
+        if (tree) container.appendChild(renderJsonNode(tree, 0, "0"));
+        else container.innerHTML = '<p style="color:var(--muted);font-size:12px;padding:16px">Aucun élément visible.</p>';
+        domTreeBuilt = true;
+        afterTreeRebuild();
+      }
+      if (e.data && e.data.type === "mx-anim-data") {
+        animData = e.data.animations || [];
+        animMaxTime = Math.max(1000, ...animData.map(a => a.endTime || 1000));
+        animScrub.max = Math.round(animMaxTime);
+        animScrub.value = 0;
+        renderAnimTracks();
+        updateAnimTime(0);
+      }
+    });
+
+    function renderAnimTracks() {
+      if (animData.length === 0) {
+        animTracks.innerHTML = '<p style="color:var(--muted);font-size:12px;padding:10px">Aucune animation détectée.</p>';
+        return;
+      }
+      animTracks.innerHTML = animData.map(a => {
+        const leftPct = (a.delay / animMaxTime * 100).toFixed(2);
+        const widthPct = ((a.duration * Math.min(a.iterations || 1, 10)) / animMaxTime * 100).toFixed(2);
+        const label = a.name !== ("anim-" + a.i) ? a.name : `${a.tag}${a.cls ? "." + a.cls : ""}`;
+        return `<div class="anim-track">
+          <span class="track-label" title="${a.name}">${label}</span>
+          <div class="track-bar-wrap">
+            <div class="anim-playhead" style="left:0%"></div>
+            <div class="track-bar" style="left:${leftPct}%;width:${widthPct}%"></div>
+          </div>
+        </div>`;
+      }).join("");
+    }
+
+    function updateAnimTime(ms) {
+      const s = (ms / 1000).toFixed(2);
+      const total = (animMaxTime / 1000).toFixed(2);
+      animTime.textContent = `${s}s / ${total}s`;
+      const pct = (ms / animMaxTime * 100).toFixed(2);
+      animTracks.querySelectorAll(".anim-playhead").forEach(ph => { ph.style.left = pct + "%"; });
+    }
+
+    animScrub.addEventListener("input", () => {
+      const t = Number(animScrub.value);
+      animPlaying = false;
+      if (animRafId) { cancelAnimationFrame(animRafId); animRafId = null; }
+      try { preview.contentWindow.postMessage({ type: "mx-anim-seek", time: t }, "*"); } catch(e) {}
+      updateAnimTime(t);
+    });
+
+    document.getElementById("animPlay").addEventListener("click", () => {
+      if (animPlaying) return;
+      animPlaying = true;
+      animStartWall = performance.now();
+      animStartTime = Number(animScrub.value);
+      try { preview.contentWindow.postMessage({ type: "mx-anim-play" }, "*"); } catch(e) {}
+      function tick() {
+        if (!animPlaying) return;
+        const elapsed = performance.now() - animStartWall;
+        const current = animStartTime + elapsed;
+        if (current >= animMaxTime) {
+          animPlaying = false;
+          animScrub.value = animMaxTime;
+          updateAnimTime(animMaxTime);
+          return;
+        }
+        animScrub.value = current;
+        updateAnimTime(current);
+        animRafId = requestAnimationFrame(tick);
+      }
+      animRafId = requestAnimationFrame(tick);
+    });
+
+    document.getElementById("animPause").addEventListener("click", () => {
+      animPlaying = false;
+      if (animRafId) { cancelAnimationFrame(animRafId); animRafId = null; }
+      try { preview.contentWindow.postMessage({ type: "mx-anim-pause" }, "*"); } catch(e) {}
+    });
+
+    document.getElementById("animReset").addEventListener("click", () => {
+      animPlaying = false;
+      if (animRafId) { cancelAnimationFrame(animRafId); animRafId = null; }
+      animScrub.value = 0;
+      updateAnimTime(0);
+      try { preview.contentWindow.postMessage({ type: "mx-anim-reset" }, "*"); } catch(e) {}
+    });
+
+    // ── Context menu ──
+    const ctxMenu = document.getElementById("ctxMenu");
+    let ctxData = null;
+    function showContextMenu(x, y, data) {
+      ctxData = data;
+      ctxMenu.style.left = Math.min(x, window.innerWidth - 200) + "px";
+      ctxMenu.style.top = Math.min(y, window.innerHeight - 200) + "px";
+      ctxMenu.classList.add("show");
+    }
+    document.addEventListener("click", () => ctxMenu.classList.remove("show"));
+    document.addEventListener("contextmenu", (e) => {
+      if (!e.target.closest(".dom-node")) ctxMenu.classList.remove("show");
+    });
+    document.getElementById("ctxGoto").addEventListener("click", () => {
+      if (!ctxData) return;
+      gotoInIframe(ctxData.selector, ctxData.nthPath, true);
+    });
+    document.getElementById("ctxAdd").addEventListener("click", () => {
+      if (!ctxData) return;
+      addSection(ctxData);
+      showToast("Ajouté à la bibliothèque");
+    });
+    document.getElementById("ctxCopyHtml").addEventListener("click", () => {
+      if (!ctxData) return;
+      navigator.clipboard.writeText(ctxData.html).then(() => showToast("HTML copié"));
+    });
+    document.getElementById("ctxCopySelector").addEventListener("click", () => {
+      if (!ctxData) return;
+      navigator.clipboard.writeText(ctxData.selector).then(() => showToast("Sélecteur copié: " + ctxData.selector));
+    });
+    document.getElementById("ctxExtract").addEventListener("click", () => {
+      if (!ctxData || !window.__capturedUrl) return;
+      urlInput.value = window.__capturedUrl;
+      window.__pendingSelector = ctxData.selector;
+      exitPreview();
+      form.dispatchEvent(new Event("submit"));
+    });
+
+    // Clone section handler — uses server-side Puppeteer extraction
+    document.getElementById("ctxClone").addEventListener("click", async () => {
+      if (!ctxData) return;
+      const url = window.__capturedUrl || window.__proxyUrl;
+      if (!url) { showToast("Pas d'URL source"); return; }
+      showToast("Clonage en cours...");
+      try {
+        const resp = await fetch("/api/clone-section", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ url, selector: ctxData.selector, nthPath: ctxData.nthPath, path: ctxData.path }),
+        });
+        const json = await resp.json();
+        if (!json.ok) throw new Error(json.error || "Erreur serveur");
+        // Download the file
+        const blob = new Blob([json.html], { type: "text/html" });
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = blobUrl;
+        a.download = "cloned-section.html";
+        a.click();
+        // Show in preview
+        preview.src = blobUrl;
+        showToast("Section clonée ! Fichier téléchargé");
+      } catch(err) {
+        showToast("Erreur: " + err.message);
+      }
+    });
+    // Listen for clone result
+    window.addEventListener("message", (e) => {
+      if (!e.data || e.data.type !== "mx-clone-result") return;
+      if (e.data.error) { showToast("Erreur: " + e.data.error); return; }
+
+      // Build standalone HTML from extracted styles + animations
+      const { html, styles, animations, dimensions } = e.data;
+
+      // Generate CSS rules from computed styles
+      let css = "";
+      for (const s of styles) {
+        const decls = Object.entries(s.styles).map(([k, v]) => `  ${k}: ${v};`).join("\\n");
+        css += `[data-mx-clone="${s.className}"] {\\n${decls}\\n}\\n`;
+      }
+
+      // Generate @keyframes from captured animations
+      let animCss = "";
+      let animBindings = "";
+      for (const a of animations) {
+        const kfName = "mx-ka-" + a.targetClass;
+        const stops = a.keyframes.map(kf => {
+          const pct = kf.offset != null ? (kf.offset * 100).toFixed(1) + "%" : "0%";
+          const props = Object.entries(kf).filter(([k]) => k !== "offset" && k !== "easing").map(([k, v]) => {
+            return "    " + k.replace(/([A-Z])/g, "-$1").toLowerCase() + ": " + v + ";";
+          }).join("\\n");
+          return `  ${pct} {\\n${props}\\n  }`;
+        }).join("\\n");
+        animCss += `@keyframes ${kfName} {\\n${stops}\\n}\\n`;
+        const dur = Math.round(a.duration || 1000);
+        const del = Math.round(a.delay || 0);
+        const iter = a.iterations === Infinity || a.iterations === null ? "infinite" : (a.iterations || 1);
+        const dir = a.direction || "normal";
+        const ease = a.easing || "ease";
+        const fill = a.fill || "none";
+        animBindings += `[data-mx-clone="${a.targetClass}"] { animation: ${kfName} ${dur}ms ${ease} ${del}ms ${iter} ${dir} ${fill}; }\\n`;
+      }
+
+      const fullHtml = `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cloned Section</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; background: #0a0a0a; padding: 40px 20px; }
+    .section-wrapper { width: 100%; max-width: ${dimensions.width}px; }
+    ${css}
+    ${animCss}
+    ${animBindings}
+  </style>
+</head>
+<body>
+  <div class="section-wrapper">
+    ${html}
+  </div>
+</body>
+</html>`;
+
+      // Show in preview iframe + download link
+      const blob = new Blob([fullHtml], { type: "text/html" });
+      const blobUrl = URL.createObjectURL(blob);
+
+      // Show in preview
+      preview.src = blobUrl;
+      currentView = "reel";
+      viewProxyBtn.classList.remove("active");
+      viewReelBtn.classList.add("active");
+
+      // Store and offer download
+      window.__lastClonedSection = { html: fullHtml, css, animCss, rawHtml: html, styles, animations };
+
+      // Create download
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = "cloned-section.html";
+      a.click();
+
+      showToast("Section clonée ! Fichier téléchargé + affiché dans le preview");
+    });
+
+    // Panel resize
+    document.getElementById("panelResize").addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      const startX = e.clientX;
+      const startW = sidePanel.offsetWidth;
+      const onMove = (e2) => {
+        const w = Math.max(300, Math.min(800, startW - (e2.clientX - startX)));
+        sidePanel.style.width = w + "px";
+        previewMode.style.marginRight = (w + 24) + "px";
+      };
+      const onUp = () => { document.removeEventListener("mousemove", onMove); document.removeEventListener("mouseup", onUp); };
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+    });
+
+    function toggleSidePanel() {
+      sidePanel.classList.toggle("open");
+      previewMode.classList.toggle("panel-open", sidePanel.classList.contains("open"));
+    }
+    document.getElementById("toolSections").addEventListener("click", toggleSidePanel);
+    document.getElementById("sidePanelClose").addEventListener("click", () => {
+      sidePanel.classList.remove("open");
+      previewMode.classList.remove("panel-open");
+    });
+
+    function addSection(data) {
+      collectedSections.push({
+        id: Date.now(),
+        tag: data.tag,
+        cls: data.cls,
+        selector: data.selector,
+        html: data.html,
+      });
+      renderSections();
+      // Auto-open panel
+      sidePanel.classList.add("open");
+      previewMode.classList.add("panel-open");
+    }
+    function renderSections() {
+      sectionCount.textContent = collectedSections.length;
+      if (collectedSections.length === 0) {
+        sectionList.innerHTML = '<div class="side-panel-empty">Active le pick puis clique sur des sections.</div>';
+        return;
+      }
+      sectionList.innerHTML = collectedSections.map((s, i) => {
+        const label = `<${s.tag}>${s.cls ? " ." + String(s.cls).split(" ")[0] : ""}`;
+        const preview = (s.html || "").replace(/<[^>]+>/g, "").slice(0, 80);
+        return `<div class="section-card" draggable="true" data-idx="${i}">
+          <div class="card-actions">
+            <button title="Copier" data-copy="${i}">📋</button>
+            <button title="Supprimer" data-del="${i}">✕</button>
+          </div>
+          <div class="card-label">${label}</div>
+          <div class="card-preview">${preview || "(empty)"}</div>
+        </div>`;
+      }).join("");
+      // Delete
+      sectionList.querySelectorAll("[data-del]").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          collectedSections.splice(Number(btn.dataset.del), 1);
+          renderSections();
+        });
+      });
+      // Copy individual
+      sectionList.querySelectorAll("[data-copy]").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const s = collectedSections[Number(btn.dataset.copy)];
+          if (s) navigator.clipboard.writeText(s.html).then(() => showToast("Copié !"));
+        });
+      });
+      // Drag & drop reorder
+      let dragIdx = null;
+      sectionList.querySelectorAll(".section-card").forEach(card => {
+        card.addEventListener("dragstart", (e) => {
+          dragIdx = Number(card.dataset.idx);
+          card.classList.add("dragging");
+        });
+        card.addEventListener("dragend", () => card.classList.remove("dragging"));
+        card.addEventListener("dragover", (e) => e.preventDefault());
+        card.addEventListener("drop", (e) => {
+          e.preventDefault();
+          const dropIdx = Number(card.dataset.idx);
+          if (dragIdx !== null && dragIdx !== dropIdx) {
+            const item = collectedSections.splice(dragIdx, 1)[0];
+            collectedSections.splice(dropIdx, 0, item);
+            renderSections();
+          }
+          dragIdx = null;
+        });
+      });
+    }
+    // Export all sections
+    document.getElementById("exportSectionsBtn").addEventListener("click", () => {
+      if (collectedSections.length === 0) return;
+      const allHtml = collectedSections.map((s, i) => `<!-- Section ${i + 1}: ${s.selector} -->\n${s.html}`).join("\n\n");
+      const blob = new Blob([allHtml], { type: "text/html" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "sections.html";
+      a.click();
+    });
+    document.getElementById("clearSectionsBtn").addEventListener("click", () => {
+      collectedSections = [];
+      renderSections();
+    });
+
+    // ── Section picker ──
+    const pickBtn = document.getElementById("pickBtn");
+    pickBtn.addEventListener("click", () => setPickMode(true));
+    window.addEventListener("message", (e) => {
+      if (e.data && e.data.type === "mx-pick") {
+        document.getElementById("selectorInput").value = e.data.selector;
+        // Add to sections panel
+        addSection(e.data);
+        showToast(`Ajouté : <${e.data.tag}>${e.data.cls ? " ." + String(e.data.cls).split(" ")[0] : ""}`);
+      }
+    });
+    document.getElementById("extractSectionBtn").addEventListener("click", () => {
+      const sel = document.getElementById("selectorInput").value.trim();
+      if (!sel || !window.__capturedUrl) return;
+      urlInput.value = window.__capturedUrl;
+      window.__pendingSelector = sel;
+      exitPreview();
+      form.dispatchEvent(new Event("submit"));
+    });
+
+    // ── Reverse engineer display ──
+    function renderReverseData(rd) {
+      const el = document.getElementById("reverseInfo");
+      if (!rd) { el.innerHTML = '<p style="color:var(--muted);font-size:12px">Pas de données reverse. Relance un Extract.</p>'; return; }
+      let h = "";
+      if (rd.shaders && rd.shaders.length) {
+        h += `<div class="section-title">Shaders GLSL (${rd.shaders.length})</div>`;
+        rd.shaders.forEach((s, i) => {
+          h += `<details style="margin-bottom:4px"><summary style="font-size:11px;color:var(--fg);cursor:pointer">${s.type} shader #${i}</summary><pre style="font-size:10px;max-height:150px;overflow:auto;margin:4px 0">${s.source.replace(/</g,"&lt;")}</pre></details>`;
+        });
+      }
+      if (rd.gsapTimeline) {
+        h += `<div class="section-title" style="margin-top:8px">GSAP Timeline (${rd.gsapTimeline.tweenCount} tweens)</div>`;
+        h += `<details><summary style="font-size:11px;color:var(--fg);cursor:pointer">Voir les tweens</summary><pre style="font-size:10px;max-height:200px;overflow:auto;margin:4px 0">${JSON.stringify(rd.gsapTimeline.tweens, null, 2).replace(/</g,"&lt;")}</pre></details>`;
+      }
+      if (rd.threeScene) {
+        h += `<div class="section-title" style="margin-top:8px">Three.js Scene</div>`;
+        h += `<details><summary style="font-size:11px;color:var(--fg);cursor:pointer">Scene JSON</summary><pre style="font-size:10px;max-height:200px;overflow:auto;margin:4px 0">${JSON.stringify(rd.threeScene, null, 2).slice(0, 5000).replace(/</g,"&lt;")}</pre></details>`;
+      }
+      if (rd.animConfigs && rd.animConfigs.length) {
+        h += `<div class="section-title" style="margin-top:8px">anime.js configs (${rd.animConfigs.length})</div>`;
+        h += `<pre style="font-size:10px;max-height:150px;overflow:auto">${JSON.stringify(rd.animConfigs, null, 2).replace(/</g,"&lt;")}</pre>`;
+      }
+      if (!h) h = '<p style="color:var(--muted);font-size:12px">Aucun shader, GSAP, Three.js ou anime.js détecté sur ce site.</p>';
+      el.innerHTML = h;
+    }
+
+    document.getElementById("recreateBtn").addEventListener("click", async () => {
+      const prompt = document.getElementById("recreatePrompt").value.trim();
+      const lang = document.getElementById("recreateLang").value;
+      const btn = document.getElementById("recreateBtn");
+      const output = document.getElementById("recreateOutput");
+      btn.disabled = true; btn.textContent = "...";
+      output.textContent = "Claude analyse les données et génère le code...";
+      try {
+        const resp = await fetch("/api/recreate", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            reverseData: window.__reverseData,
+            tokens: window.__designTokens,
+            language: lang,
+            prompt: prompt || "Recreate this effect faithfully",
+          }),
+        });
+        const json = await resp.json();
+        if (!json.ok) throw new Error(json.error);
+        output.textContent = json.code;
+      } catch (err) {
+        output.textContent = "Erreur: " + err.message;
+      } finally {
+        btn.disabled = false; btn.textContent = "Recréer avec AI";
+      }
+    });
+
+    // ── Convert ──
+    document.getElementById("convertBtn").addEventListener("click", async () => {
+      const lang = document.getElementById("langSelect").value;
+      const btn = document.getElementById("convertBtn");
+      const output = document.getElementById("codeOutput");
+      if (lang === "html") { output.textContent = window.__capturedHtml || ""; return; }
+      btn.disabled = true; btn.textContent = "…";
+      output.textContent = "Conversion en cours…";
+      try {
+        const resp = await fetch("/api/convert", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ html: window.__capturedHtml, css: "", language: lang }) });
+        const json = await resp.json();
+        if (!json.ok) throw new Error(json.error);
+        output.textContent = json.code;
+        document.getElementById("apiHint").textContent = json.mode === "claude" ? "Via Claude API" : "Conversion locale (basique).";
+      } catch (err) { output.textContent = "Erreur: " + err.message; }
+      finally { btn.disabled = false; btn.textContent = "Convertir"; }
+    });
+    document.getElementById("copyCodeBtn").addEventListener("click", () => {
+      navigator.clipboard.writeText(document.getElementById("codeOutput").textContent);
+    });
+
+    // ── Generate ──
+    document.getElementById("generateBtn").addEventListener("click", async () => {
+      const prompt = document.getElementById("genPrompt").value.trim();
+      if (!prompt) return;
+      const lang = document.getElementById("genLang").value;
+      const btn = document.getElementById("generateBtn");
+      const output = document.getElementById("genOutput");
+      btn.disabled = true; btn.textContent = "…";
+      output.textContent = "Claude génère…";
+      try {
+        const resp = await fetch("/api/generate", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ tokens: window.__designTokens, prompt, language: lang }) });
+        const json = await resp.json();
+        if (!json.ok) throw new Error(json.error);
+        output.textContent = json.code;
+      } catch (err) { output.textContent = "Erreur: " + err.message; }
+      finally { btn.disabled = false; btn.textContent = "Générer"; }
+    });
+
+    // ── Tokens ──
+    function renderTokens(tokens) {
+      if (!tokens) return;
+      const c = document.getElementById("tokensDisplay");
+      let h = "";
+      if (tokens.colors && tokens.colors.length) {
+        h += "<div class='section-title'>Colors</div><div class='token-preview'>";
+        tokens.colors.forEach(c => { h += `<div class="token-swatch" style="background:${c}" title="${c}"></div>`; });
+        h += "</div>";
+      }
+      const show = (label, arr) => { if (arr && arr.length) h += `<div class='section-title' style='margin-top:8px'>${label}</div><p style='font-size:11px;color:var(--muted)'>${arr.join(" · ")}</p>`; };
+      show("Fonts", tokens.fonts);
+      show("Sizes", tokens.fontSizes);
+      show("Radius", tokens.borderRadius);
+      show("Spacing", tokens.spacing);
+      if (tokens.shadows && tokens.shadows.length) {
+        h += "<div class='section-title' style='margin-top:8px'>Shadows</div><p style='font-size:10px;color:var(--muted);word-break:break-all'>" + tokens.shadows.join("<br>") + "</p>";
+      }
+      c.innerHTML = h;
+    }
+  </script>
+</body>
+</html>

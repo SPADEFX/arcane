@@ -9,7 +9,7 @@ const services = [
     name: "Extract Tool API",
     cmd: "node",
     args: ["server.js"],
-    cwd: path.join(ROOT, "Extract Tool"),
+    cwd: path.join(__dirname, "extract-tool"),
   },
   {
     name: "Medal Forge",

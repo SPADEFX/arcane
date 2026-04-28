@@ -1,0 +1,278 @@
+const puppeteer = require("puppeteer");
+const pageCapture = require("./capture");
+const HOOKS = require("./hooks");
+
+async function launch() {
+  return puppeteer.launch({
+    headless: "new",
+    // Bypass CSSOM same-origin so we can read cross-origin stylesheets (CDN
+    // CSS, Google Fonts). Without this, most real sites capture as bare HTML.
+    args: [
+      "--disable-web-security",
+      "--disable-features=IsolateOrigins,site-per-process",
+    ],
+  });
+}
+
+async function extractWith(browser, url, opts = {}) {
+  // Default to a desktop viewport so responsive sites don't collapse grids
+  // into mobile single-column layouts that we then render in a narrow iframe.
+  const [vw, vh] = (opts.viewport || "1440x900").split("x").map(Number);
+  const page = await browser.newPage();
+  try {
+    await page.setViewport({ width: vw, height: vh, deviceScaleFactor: 1 });
+    // Force media feature defaults so sites that gate animations behind
+    // `@media (prefers-reduced-motion: no-preference)` actually run them in
+    // headless. Headless Chromium's default varies by version.
+    try {
+      await page.emulateMediaFeatures([
+        { name: "prefers-reduced-motion", value: "no-preference" },
+        { name: "prefers-color-scheme", value: "light" },
+      ]);
+    } catch (e) {}
+    // Install recorder hooks BEFORE the page's JS runs — intercepts every
+    // .animate() call and every style/class mutation with precise timestamps.
+    await page.evaluateOnNewDocument(HOOKS);
+    await page.goto(url, { waitUntil: ["domcontentloaded", "networkidle2"], timeout: opts.timeoutMs || 120000 });
+    // Thorough mode: wait longer for async JS (hydration, font swap, lazy
+    // anims) to settle before we start timing-sensitive analysis.
+    const waitMs = opts.waitMs ?? (opts.thorough ? 3000 : 1500);
+    await new Promise((r) => setTimeout(r, waitMs));
+
+    // ── Full Clone mode ─────────────────────────────────────────────────
+    // Grab the full page HTML with <base href> pointing to the original
+    // site. All CSS/JS/images load from the original CDN URLs. The HTML
+    // is saved to a local file and served from localhost (not blob://)
+    // so JS hydration works without origin mismatch.
+    let rawHtml = null;
+    let cloneId = null;
+    if (opts.fullClone || opts.keepScripts) {
+      const fs = require("fs");
+      const pathMod = require("path");
+
+      cloneId = "clone_" + Date.now();
+      const cloneDir = pathMod.join(__dirname, "..", "public", "clones", cloneId);
+      fs.mkdirSync(cloneDir, { recursive: true });
+
+      rawHtml = await page.evaluate(() => {
+        var origin = location.origin; // e.g. "https://clerk.com"
+
+        // <base href> so relative URLs resolve to the original site
+        document.querySelectorAll("base").forEach(function(b) { b.remove(); });
+        var base = document.createElement("base");
+        base.href = origin + "/";
+        document.head.prepend(base);
+
+        // Rewrite absolute-path URLs (start with /) to full URLs.
+        // <base href> does NOT affect absolute paths like /foo — only
+        // relative ones like foo. So /_next/image?... resolves to
+        // localhost/_next/image instead of clerk.com/_next/image.
+        function fixAbsolutePaths(el, attr) {
+          var val = el.getAttribute(attr);
+          if (!val) return;
+          if (val.startsWith("/") && !val.startsWith("//")) {
+            el.setAttribute(attr, origin + val);
+          }
+        }
+        // Fix images src + srcset
+        document.querySelectorAll("img").forEach(function(img) {
+          fixAbsolutePaths(img, "src");
+          var srcset = img.getAttribute("srcset");
+          if (srcset) {
+            img.setAttribute("srcset", srcset.replace(/(^|,\s*)(\/[^\s,]+)/g, function(m, prefix, path) {
+              return prefix + origin + path;
+            }));
+          }
+        });
+        // Fix link hrefs (CSS, preload, etc.)
+        document.querySelectorAll("link[href]").forEach(function(l) {
+          fixAbsolutePaths(l, "href");
+        });
+        // Fix script srcs
+        document.querySelectorAll("script[src]").forEach(function(sc) {
+          fixAbsolutePaths(sc, "src");
+        });
+        // Fix video/source/audio
+        document.querySelectorAll("video[src], source[src], audio[src]").forEach(function(el) {
+          fixAbsolutePaths(el, "src");
+        });
+        // Fix background-image url(/) in inline styles
+        document.querySelectorAll("[style]").forEach(function(el) {
+          var s = el.style.backgroundImage;
+          if (s && s.includes("url(") && /url\(["']?\/[^/]/.test(s)) {
+            el.style.backgroundImage = s.replace(/url\(["']?(\/[^"')]+)["']?\)/g, function(m, path) {
+              return 'url("' + origin + path + '")';
+            });
+          }
+        });
+
+        // Remove analytics/tracking
+        document.querySelectorAll("script").forEach(function(sc) {
+          var t = (sc.src || "") + " " + (sc.textContent || "");
+          if (/google-analytics|googletagmanager|gtag|facebook|fbevents|hotjar|segment|mixpanel|intercom|sentry|datadog|newrelic/i.test(t)) sc.remove();
+        });
+        // Remove CSP
+        document.querySelectorAll('meta[http-equiv="Content-Security-Policy"]').forEach(function(m) { m.remove(); });
+
+        return "<!doctype html>\\n" + document.documentElement.outerHTML;
+      });
+
+      // Inject our picker/inspector script into the Full Clone HTML so
+      // pick, goto, highlight, and animation controls work in Capturé view.
+      if (rawHtml) {
+        const { buildHtml } = require("./render");
+        const INTERACTIONS = require("./interactions");
+        // Extract the picker script from a dummy render to avoid duplicating it.
+        // Simpler: just inject the minimal postMessage handler.
+        const pickerScript = `<script>
+(function(){
+  var pickActive=false,highlighted=null;
+  var ov=document.createElement("div");ov.style.cssText="position:fixed;pointer-events:none;border:2px dashed #7c9cff;border-radius:4px;z-index:999999;display:none;transition:all .08s ease-out";document.body.appendChild(ov);
+  var lb=document.createElement("div");lb.style.cssText="position:fixed;pointer-events:none;z-index:999999;background:#7c9cff;color:#0b0c0f;font:600 11px system-ui;padding:2px 8px;border-radius:4px;display:none;white-space:nowrap";document.body.appendChild(lb);
+  function showOv(el){if(!el||el===document.body){ov.style.display="none";lb.style.display="none";return}var r=el.getBoundingClientRect();ov.style.display="block";ov.style.left=r.left+"px";ov.style.top=r.top+"px";ov.style.width=r.width+"px";ov.style.height=r.height+"px";lb.style.display="block";lb.style.left=r.left+"px";lb.style.top=Math.max(0,r.top-22)+"px";lb.textContent=el.tagName.toLowerCase()+(el.className&&typeof el.className==="string"?"."+el.className.trim().split(/\\s+/)[0]:"")}
+  function cssPath(el){if(!el||el===document.body)return"body";var s=[];var c=el;for(var d=0;c&&c!==document.body&&d<15;d++){var seg=c.tagName.toLowerCase();if(c.id){seg+="#"+c.id;s.unshift(seg);break}var p=c.parentElement;if(p){var sibs=Array.from(p.children).filter(function(x){return x.tagName===c.tagName});if(sibs.length>1)seg+=":nth-of-type("+(sibs.indexOf(c)+1)+")"}s.unshift(seg);c=p}return s.join(" > ")}
+  document.addEventListener("mousemove",function(e){if(!pickActive)return;highlighted=e.target;showOv(highlighted)});
+  document.addEventListener("click",function(e){if(!pickActive)return;e.preventDefault();e.stopPropagation();var el=highlighted||e.target;window.parent.postMessage({type:"mx-pick",selector:cssPath(el),html:el.outerHTML,tag:el.tagName.toLowerCase(),cls:el.className},"*")},true);
+  window.addEventListener("message",function(e){
+    if(e.data==="mx-pick-on"){pickActive=true;document.body.style.cursor="crosshair"}
+    if(e.data==="mx-pick-off"){pickActive=false;document.body.style.cursor="";ov.style.display="none";lb.style.display="none"}
+    if(e.data&&e.data.type==="mx-highlight"&&e.data.selector){try{var el=document.querySelector(e.data.selector);if(el)showOv(el)}catch(x){}}
+    if(e.data&&e.data.type==="mx-highlight"&&!e.data.selector){ov.style.display="none";lb.style.display="none"}
+    if(e.data&&e.data.type==="mx-goto"&&e.data.selector){try{var el=document.querySelector(e.data.selector);if(!el&&e.data.nthPath)el=document.querySelector(e.data.nthPath);if(el){el.scrollIntoView({behavior:"smooth",block:"center"});showOv(el)}}catch(x){}}
+  });
+})();
+<\\/script>`;
+        rawHtml = rawHtml.replace(/<\/body>/i, pickerScript + "\n</body>");
+      }
+
+      fs.writeFileSync(pathMod.join(cloneDir, "index.html"), rawHtml);
+    }
+
+    const data = await page.evaluate(pageCapture, {
+      selector: opts.selector || null,
+      thorough: !!opts.thorough,
+      slowdown: typeof opts.slowdown === "number" ? opts.slowdown : 1,
+      keepScripts: !!opts.keepScripts,
+    });
+    if (rawHtml) data.rawHtml = rawHtml;
+    if (cloneId) data.cloneId = cloneId;
+    return data;
+  } finally {
+    await page.close().catch(() => {});
+  }
+}
+
+async function extractOne(url, opts = {}) {
+  const browser = await launch();
+  try {
+    return await extractWith(browser, url, opts);
+  } finally {
+    await browser.close().catch(() => {});
+  }
+}
+
+async function recordFrames(browser, url, opts = {}) {
+  const [vw, vh] = (opts.viewport || "1280x900").split("x").map(Number);
+  const fps = opts.fps || 15;
+  const durationMs = opts.recordDuration || 5000;
+  const page = await browser.newPage();
+  try {
+    await page.setViewport({ width: vw, height: vh, deviceScaleFactor: 1 });
+    try {
+      await page.emulateMediaFeatures([
+        { name: "prefers-reduced-motion", value: "no-preference" },
+        { name: "prefers-color-scheme", value: "light" },
+      ]);
+    } catch (e) {}
+    // Force preserveDrawingBuffer on WebGL so toDataURL() works.
+    await page.evaluateOnNewDocument(() => {
+      const orig = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function(type, attrs) {
+        if (type === "webgl" || type === "webgl2" || type === "experimental-webgl") {
+          attrs = Object.assign({}, attrs, { preserveDrawingBuffer: true });
+        }
+        return orig.call(this, type, attrs);
+      };
+    });
+    await page.goto(url, { waitUntil: ["domcontentloaded", "networkidle2"], timeout: opts.timeoutMs || 120000 });
+    await new Promise((r) => setTimeout(r, 2000));
+    // Capture each <canvas> element's frames via toDataURL inside the page.
+    const result = await page.evaluate(async (opts) => {
+      const canvases = Array.from(document.querySelectorAll("canvas"));
+      if (canvases.length === 0) return { canvases: [] };
+      const interval = Math.round(1000 / opts.fps);
+      const results = canvases.map((c) => {
+        const r = c.getBoundingClientRect();
+        return {
+          width: c.width || r.width,
+          height: c.height || r.height,
+          left: Math.round(r.left),
+          top: Math.round(r.top),
+          frames: [],
+        };
+      });
+      const startT = performance.now();
+      while (performance.now() - startT < opts.durationMs) {
+        for (let i = 0; i < canvases.length; i++) {
+          try {
+            results[i].frames.push(canvases[i].toDataURL("image/jpeg", 0.7));
+          } catch (e) { /* tainted canvas */ }
+        }
+        await new Promise((r) => setTimeout(r, interval));
+      }
+      return { canvases: results };
+    }, { fps, durationMs });
+    const title = await page.title();
+    return { ...result, fps, durationMs, url, title };
+  } finally {
+    await page.close().catch(() => {});
+  }
+}
+
+function buildRecordingHtml(rec) {
+  const canvasBlocks = (rec.canvases || []).filter((c) => c.frames.length > 0).map((c, ci) => {
+    const totalMs = c.frames.length * (1000 / rec.fps);
+    const framePct = (100 / c.frames.length).toFixed(4);
+    const imgs = c.frames.map((b64, i) => {
+      const delayMs = Math.round(i * (1000 / rec.fps));
+      return `<img style="animation-delay:${delayMs}ms" src="${b64}">`;
+    }).join("\n");
+    return {
+      html: `<div class="canvas-player" style="width:${c.width}px;height:${c.height}px">\n${imgs}\n</div>`,
+      css: `.canvas-player:nth-of-type(${ci + 1}) img { animation: mx-f${ci} ${totalMs}ms step-end infinite; }
+@keyframes mx-f${ci} { 0%,${framePct}% { opacity:1 } ${(Number(framePct) + 0.01).toFixed(4)}%,100% { opacity:0 } }`,
+      info: `canvas #${ci}: ${c.width}x${c.height}, ${c.frames.length} frames`,
+    };
+  });
+  if (canvasBlocks.length === 0) return `<!doctype html><html><body><p>No canvas frames captured.</p></body></html>`;
+  return `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${rec.title || "canvas recording"}</title>
+  <style>
+    body { margin:0; background:#111; display:flex; flex-wrap:wrap; gap:20px; justify-content:center; align-items:center; min-height:100vh; padding:20px; }
+    .canvas-player { position:relative; border:1px solid #333; border-radius:8px; overflow:hidden; }
+    .canvas-player img { position:absolute; top:0; left:0; width:100%; height:100%; object-fit:contain; opacity:0; }
+    ${canvasBlocks.map((b) => b.css).join("\n    ")}
+  </style>
+</head>
+<body>
+  ${canvasBlocks.map((b) => b.html).join("\n  ")}
+  <!-- source: ${rec.url} · ${canvasBlocks.map((b) => b.info).join(" | ")} -->
+</body>
+</html>`;
+}
+
+async function extractPasses(browser, url, opts = {}) {
+  const passes = Math.max(1, Math.min(10, opts.passes || 1));
+  const runs = [];
+  for (let i = 0; i < passes; i++) {
+    const data = await extractWith(browser, url, { ...opts, passIndex: i, totalPasses: passes });
+    runs.push(data);
+    if (typeof opts.onPassDone === "function") opts.onPassDone(i + 1);
+  }
+  return runs;
+}
+
+module.exports = { launch, extractWith, extractOne, extractPasses, recordFrames, buildRecordingHtml };
