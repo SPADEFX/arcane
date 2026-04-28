@@ -26,11 +26,12 @@ export function Builder() {
   const { activePageId, setActivePageId, setIsDragging } = useBuilderUIStore();
   const { addBlock, moveBlock } = useSiteStore();
   const [draggedType, setDraggedType] = useState<string | null>(null);
+  const [blocksReady, setBlocksReady] = useState(false);
 
   // Load extracted components from IndexedDB + set title
   useEffect(() => {
     document.title = "Builder";
-    loadExtractedBlocks();
+    loadExtractedBlocks().then(() => setBlocksReady(true));
   }, []);
 
   // Initialize active page

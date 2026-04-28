@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { SiteTheme } from "@uilibrary/ui";
 import { useSiteStore } from "../builder-stores/site-store";
 import { BlockRenderer } from "../builder-components/block-renderer";
@@ -10,10 +10,11 @@ export function Preview() {
   const { siteId } = useParams<{ siteId: string }>();
   const navigate = useNavigate();
   const site = useSiteStore((s) => s.sites.find((x) => x.id === siteId));
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     document.title = site ? `Preview — ${site.name}` : "Preview";
-    loadExtractedBlocks();
+    loadExtractedBlocks().then(() => setReady(true));
   }, [site]);
 
   if (!site) {
@@ -43,7 +44,9 @@ export function Preview() {
         radius={site.theme.radius}
       >
         <div className="force-desktop canvas-isolate" style={{ background: "var(--color-bg)", minHeight: "100%" }}>
-          {page?.blocks.map((block) => (
+          {!ready ? (
+            <div style={{ padding: 40, textAlign: "center", color: "#666" }}>Loading blocks...</div>
+          ) : page?.blocks.map((block) => (
             <BlockRenderer key={block.id} block={block} />
           ))}
         </div>
