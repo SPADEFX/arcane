@@ -1,0 +1,17 @@
+{
+  "name": "extract-tool",
+  "version": "0.3.0",
+  "private": true,
+  "description": "Headless-browser extractor for CSS animations, keyframes, and layout snapshots — with a web UI.",
+  "bin": {
+    "extract-tool": "./cli.js"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "extract": "node cli.js",
+    "help": "node cli.js --help"
+  },
+  "dependencies": {
+    "puppeteer": "^22.0.0"
+  }
+}
