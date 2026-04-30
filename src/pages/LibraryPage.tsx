@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useComponentStore } from "@/stores/component-store";
 import { bootstrapRegistry } from "@/lib/bootstrap";
-import { DynamicRenderer } from "@/components/DynamicRenderer";
 import type { ComponentDefinition } from "@/types/component-registry";
 import type { ExtractedManifest } from "@/types/extracted-manifest";
 
@@ -398,18 +397,73 @@ interface ViewProps {
   onPickDomain: (d: string) => void;
 }
 
+/* ─── Section order — semantic groups, not flat grid ──────────────────── */
+const SECTION_ORDER: { key: string; label: string }[] = [
+  // Extracted-from-the-wild come first
+  { key: "hero", label: "Heroes" },
+  { key: "nav", label: "Navigation (extracted)" },
+  { key: "footer", label: "Footers (extracted)" },
+  { key: "pricing", label: "Pricing" },
+  { key: "cta", label: "CTAs" },
+  { key: "faq", label: "FAQs" },
+  { key: "feature", label: "Features" },
+  { key: "testimonials", label: "Testimonials" },
+  { key: "content", label: "Content sections" },
+  // Then primitives
+  { key: "navigation", label: "Navigation" },
+  { key: "interactive", label: "Interactive" },
+  { key: "card", label: "Cards" },
+  { key: "background", label: "Backgrounds" },
+  { key: "text-animation", label: "Text animations" },
+  { key: "layout", label: "Layout" },
+  { key: "section", label: "Sections" },
+  { key: "form", label: "Form" },
+  { key: "divider", label: "Dividers" },
+  { key: "badge", label: "Badges" },
+  // Catch-all
+  { key: "other", label: "Other" },
+];
+
 function GridView({ items, dense, ...rest }: ViewProps & { dense: boolean }) {
+  // Group by category
+  const buckets = new Map<string, UnifiedComponent[]>();
+  for (const c of items) {
+    const k = c.category || "other";
+    if (!buckets.has(k)) buckets.set(k, []);
+    buckets.get(k)!.push(c);
+  }
+  // Order: known sections first (in SECTION_ORDER), unknown at the end
+  const orderedKeys: string[] = [];
+  for (const s of SECTION_ORDER) if (buckets.has(s.key)) orderedKeys.push(s.key);
+  for (const k of buckets.keys()) if (!orderedKeys.includes(k)) orderedKeys.push(k);
+
+  const labelFor = (k: string) =>
+    SECTION_ORDER.find((s) => s.key === k)?.label || k;
+
+  const gridClass = dense
+    ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3"
+    : "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4";
+
   return (
-    <div
-      className={
-        dense
-          ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2"
-          : "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
-      }
-    >
-      {items.map((c) => (
-        <ComponentCard key={c.id} comp={c} dense={dense} {...rest} />
-      ))}
+    <div className="space-y-12">
+      {orderedKeys.map((k) => {
+        const blocks = buckets.get(k)!;
+        return (
+          <section key={k}>
+            <header className="mb-4 flex items-baseline justify-between border-b border-white/[0.04] pb-2">
+              <h2 className="text-[13px] font-semibold uppercase tracking-[0.18em] text-white/40">
+                {labelFor(k)}
+              </h2>
+              <span className="text-[11px] text-white/25">{blocks.length}</span>
+            </header>
+            <div className={gridClass}>
+              {blocks.map((c) => (
+                <ComponentCard key={c.id} comp={c} dense={dense} {...rest} />
+              ))}
+            </div>
+          </section>
+        );
+      })}
     </div>
   );
 }
@@ -423,11 +477,16 @@ function ListView({ items, favorites, onToggleFavorite, onOpen, onPickDomain }: 
           onClick={() => onOpen(c)}
           className="group flex items-center gap-4 px-4 py-3 bg-zinc-900 hover:bg-zinc-800/50 transition-colors cursor-pointer"
         >
-          <div className="h-12 w-20 flex-shrink-0 overflow-hidden rounded bg-zinc-800">
-            {c.thumbnailUrl ? (
+          <div
+            className="h-12 w-20 flex-shrink-0 overflow-hidden rounded"
+            style={{
+              background:
+                "radial-gradient(circle, rgb(255 255 255 / 0.04) 0.6px, transparent 0.6px) #0a0a0a",
+              backgroundSize: "12px 12px",
+            }}
+          >
+            {c.thumbnailUrl && (
               <img src={c.thumbnailUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
-            ) : (
-              <div className="h-full w-full" style={{ background: `linear-gradient(135deg, hsl(${hashHue(c.name)} 20% 16%), hsl(${(hashHue(c.name)+60)%360} 18% 10%))` }} />
             )}
           </div>
           <div className="flex-1 min-w-0">
@@ -477,13 +536,12 @@ function ComponentCard({
   onOpen: (c: UnifiedComponent) => void;
   onPickDomain: (d: string) => void;
 }) {
-  const previewHeight = dense ? 110 : 160;
   const isFavorite = favorites.has(comp.id);
 
   return (
     <div
       onClick={() => onOpen(comp)}
-      className="relative bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden cursor-pointer hover:border-zinc-600 transition-all hover:-translate-y-0.5 group"
+      className="group relative cursor-pointer overflow-hidden rounded-xl border border-white/[0.06] bg-zinc-900/40 transition-all hover:-translate-y-0.5 hover:border-white/[0.12] hover:bg-zinc-900/60"
     >
       {/* Hover overlay actions */}
       <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -491,16 +549,6 @@ function ComponentCard({
           active={isFavorite}
           onClick={(e) => { e.stopPropagation(); onToggleFavorite(comp.id); }}
         />
-        <button
-          onClick={(e) => { e.stopPropagation(); onOpen(comp); }}
-          className="h-7 w-7 rounded-md bg-black/60 backdrop-blur border border-white/10 flex items-center justify-center hover:bg-black/80 hover:border-white/20"
-          title="Details"
-        >
-          <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-            <circle cx="8" cy="4" r="0.8" fill="currentColor" className="text-white/80" />
-            <rect x="7" y="6.5" width="2" height="6" rx="1" fill="currentColor" className="text-white/80" />
-          </svg>
-        </button>
       </div>
 
       {/* Persistent favorite indicator (when active) */}
@@ -512,86 +560,97 @@ function ComponentCard({
         </div>
       )}
 
-      {/* Preview area */}
-      <div
-        className="relative bg-zinc-950 border-b border-zinc-800 overflow-hidden"
-        style={{ height: `${previewHeight}px` }}
-      >
-        {comp.thumbnailUrl ? (
-          <img
-            src={comp.thumbnailUrl}
-            alt={comp.name}
-            className="h-full w-full object-cover object-top"
-            loading="lazy"
-            decoding="async"
-          />
-        ) : (
-          <ComponentPlaceholder name={comp.name} category={comp.category} />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-zinc-900/80 pointer-events-none" />
-      </div>
+      {/* Unified preview frame — same canvas regardless of source.
+          Dot-grid background, fixed aspect, lazy-mounted iframe for live render. */}
+      <CardPreview comp={comp} dense={dense} />
 
       {/* Info */}
-      <div className={dense ? "p-2.5" : "p-4"}>
-        <div className="flex items-center justify-between gap-2 mb-1">
+      <div className={dense ? "px-3 py-2.5" : "px-4 py-3"}>
+        <div className="flex items-center justify-between gap-2">
           <h3
-            className={`${dense ? "text-[12px]" : "text-sm"} font-semibold text-zinc-100 group-hover:text-white truncate`}
+            className={`${dense ? "text-[12px]" : "text-[13px]"} font-medium text-zinc-100 truncate`}
             title={comp.name}
           >
             {comp.name}
           </h3>
-          <CategoryBadge category={comp.category} />
+          {comp.sourceDomain ? (
+            <button
+              onClick={(e) => { e.stopPropagation(); onPickDomain(comp.sourceDomain!); }}
+              className="text-[10px] px-1.5 py-0.5 rounded-full text-blue-300/70 hover:text-blue-200 whitespace-nowrap"
+              title={`Filter by ${comp.sourceDomain}`}
+            >
+              {comp.sourceDomain}
+            </button>
+          ) : (
+            <span className="text-[10px] text-zinc-600 whitespace-nowrap">{comp.category}</span>
+          )}
         </div>
-
-        {/* Source domain — clickable to filter, sits under the title */}
-        {comp.sourceDomain && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onPickDomain(comp.sourceDomain!); }}
-            className="mb-2 text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-300/80 border border-blue-500/15 hover:bg-blue-500/20 hover:text-blue-200"
-            title={`Filter by ${comp.sourceDomain}`}
-          >
-            {comp.sourceDomain}
-          </button>
-        )}
-
-        {!dense && comp.description && (
-          <p className="text-xs text-zinc-500 leading-relaxed mb-2 line-clamp-2">
-            {comp.description}
-          </p>
-        )}
-        {!dense && (
-          <div className="flex flex-wrap gap-1">
-            {comp.tags.slice(0, 4).map((tag) => (
-              <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800/50 text-zinc-500">
-                {tag}
-              </span>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );
 }
 
-function ComponentPlaceholder({ name, category }: { name: string; category: string }) {
-  const hash = hashHue(name);
+/* ─── Card preview ───────────────────────────────────────────────────── */
+
+function CardPreview({ comp, dense }: { comp: UnifiedComponent; dense: boolean }) {
+  const [visible, setVisible] = useState(false);
+  const [ref, setRef] = useState<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!ref) return;
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisible(true);
+          io.disconnect();
+        }
+      },
+      { rootMargin: "200px" },
+    );
+    io.observe(ref);
+    return () => io.disconnect();
+  }, [ref]);
+
+  const aspectClass = dense ? "aspect-[4/3]" : "aspect-[16/10]";
+
   return (
     <div
-      className="flex h-full w-full flex-col items-center justify-center"
+      ref={setRef}
+      className={`relative ${aspectClass} w-full overflow-hidden border-b border-white/[0.04]`}
       style={{
-        background: `linear-gradient(135deg, hsl(${hash} 20% 12%), hsl(${(hash + 60) % 360} 18% 8%))`,
+        background:
+          "radial-gradient(circle, rgb(255 255 255 / 0.04) 0.8px, transparent 0.8px) #0a0a0a",
+        backgroundSize: "20px 20px",
       }}
     >
-      <span className="text-[10px] uppercase tracking-[0.18em] text-white/35">{category}</span>
-      <span className="mt-1 text-[12px] font-medium text-white/60 max-w-[80%] text-center truncate">
-        {name}
-      </span>
+      {!visible ? (
+        <div className="absolute inset-0 flex items-center justify-center text-[10px] uppercase tracking-[0.2em] text-white/15">
+          {comp.category}
+        </div>
+      ) : comp.thumbnailUrl ? (
+        // Extracted with PNG — render image inside the same frame
+        <img
+          src={comp.thumbnailUrl}
+          alt={comp.name}
+          className="h-full w-full object-cover object-top"
+          loading="lazy"
+          decoding="async"
+        />
+      ) : (
+        // Built-in primitive — live render in isolated iframe.
+        // pointer-events: none so clicks bubble up to the card.
+        <iframe
+          src={`/component-preview/${comp.slug}`}
+          title={comp.name}
+          loading="lazy"
+          sandbox="allow-scripts allow-same-origin"
+          className="pointer-events-none h-full w-full border-0 bg-transparent"
+          style={{ colorScheme: "dark" }}
+        />
+      )}
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent to-zinc-950/30" />
     </div>
   );
-}
-
-function hashHue(s: string) {
-  return s.split("").reduce((a, c) => (a + c.charCodeAt(0)) % 360, 0);
 }
 
 function CategoryBadge({ category }: { category: string }) {
@@ -679,23 +738,34 @@ function DetailModal({
           </svg>
         </button>
 
-        {/* Left: live preview */}
-        <div className="flex-1 min-w-0 bg-zinc-950 overflow-y-auto border-r border-white/[0.06]">
-          <div className="p-6">
-            {comp.source === "builtin" && comp.builtin ? (
-              <div className="rounded-lg overflow-hidden border border-white/[0.06]">
-                <DynamicRenderer slug={comp.slug} componentProps={comp.builtin.defaultProps} />
-              </div>
-            ) : comp.thumbnailUrl ? (
+        {/* Left: live preview — iframe for primitives keeps the rest of
+            the app's scroll/wheel behavior intact even for components that
+            attach document-level listeners. */}
+        <div
+          className="flex-1 min-w-0 overflow-hidden border-r border-white/[0.06]"
+          style={{
+            background:
+              "radial-gradient(circle, rgb(255 255 255 / 0.04) 0.8px, transparent 0.8px) #0a0a0a",
+            backgroundSize: "24px 24px",
+          }}
+        >
+          {comp.thumbnailUrl ? (
+            <div className="h-full overflow-y-auto p-6">
               <img
                 src={comp.thumbnailUrl}
                 alt={comp.name}
                 className="w-full rounded-lg border border-white/[0.06]"
               />
-            ) : (
-              <ComponentPlaceholder name={comp.name} category={comp.category} />
-            )}
-          </div>
+            </div>
+          ) : (
+            <iframe
+              src={`/component-preview/${comp.slug}`}
+              title={comp.name}
+              sandbox="allow-scripts allow-same-origin"
+              className="h-full w-full border-0 bg-transparent"
+              style={{ colorScheme: "dark" }}
+            />
+          )}
         </div>
 
         {/* Right: metadata + actions */}

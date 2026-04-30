@@ -22,6 +22,9 @@ const BuilderEditor = lazy(() =>
 const BuilderPreview = lazy(() =>
   import("./features/builder-routes/preview").then((m) => ({ default: m.Preview }))
 );
+const ComponentPreview = lazy(() =>
+  import("./pages/PreviewPage").then((m) => ({ default: m.PreviewPage }))
+);
 
 function Loading() {
   return (
@@ -59,24 +62,36 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <div className="studio-layout">
-        <Sidebar />
-        <main className="studio-main">
-          <Suspense fallback={<Loading />}>
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/extract" element={<iframe src="http://localhost:3000" style={{ width: "100%", height: "100%", border: "none" }} title="Extract Tool" />} />
-              <Route path="/shader-lab" element={<ShaderLabWrapper />} />
-              <Route path="/library" element={<LibraryPage />} />
-              <Route path="/storybook" element={<StorybookPage />} />
-              <Route path="/builder" element={<BuilderDashboard />} />
-              <Route path="/site/:siteId" element={<BuilderEditor />} />
-              <Route path="/preview/:siteId" element={<BuilderPreview />} />
-              <Route path="/medal-forge" element={<MedalForgePage />} />
-            </Routes>
-          </Suspense>
-        </main>
-      </div>
+      <Suspense fallback={<Loading />}>
+        <Routes>
+          {/* Standalone preview — no Studio chrome. Used as iframe src in
+              the Library cards. Path must NOT match /preview/:siteId. */}
+          <Route path="/component-preview/:slug" element={<ComponentPreview />} />
+
+          {/* Everything else lives inside the Studio shell */}
+          <Route
+            path="*"
+            element={
+              <div className="studio-layout">
+                <Sidebar />
+                <main className="studio-main">
+                  <Routes>
+                    <Route path="/" element={<Home />} />
+                    <Route path="/extract" element={<iframe src="http://localhost:3000" style={{ width: "100%", height: "100%", border: "none" }} title="Extract Tool" />} />
+                    <Route path="/shader-lab" element={<ShaderLabWrapper />} />
+                    <Route path="/library" element={<LibraryPage />} />
+                    <Route path="/storybook" element={<StorybookPage />} />
+                    <Route path="/builder" element={<BuilderDashboard />} />
+                    <Route path="/site/:siteId" element={<BuilderEditor />} />
+                    <Route path="/preview/:siteId" element={<BuilderPreview />} />
+                    <Route path="/medal-forge" element={<MedalForgePage />} />
+                  </Routes>
+                </main>
+              </div>
+            }
+          />
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }
