@@ -187,8 +187,9 @@ export function LibraryPage() {
   }, [allComponents, search, category, source, sort]);
 
   return (
-    <div className="absolute inset-0 overflow-y-auto bg-zinc-950 p-8">
-      <div className="max-w-7xl mx-auto">
+    <div className="flex h-full flex-col bg-zinc-950">
+      <div className="flex-1 overflow-y-auto overscroll-contain p-8">
+        <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-6 flex items-start justify-between">
           <div>
@@ -265,6 +266,7 @@ export function LibraryPage() {
         ) : (
           <GridView items={filtered} dense={density === "compact"} />
         )}
+        </div>
       </div>
     </div>
   );
