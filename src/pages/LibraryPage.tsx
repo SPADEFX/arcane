@@ -187,7 +187,7 @@ export function LibraryPage() {
   }, [allComponents, search, category, source, sort]);
 
   return (
-    <div className="h-full overflow-y-auto bg-zinc-950 p-8">
+    <div className="absolute inset-0 overflow-y-auto bg-zinc-950 p-8">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-6 flex items-start justify-between">
