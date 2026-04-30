@@ -67,7 +67,7 @@ export default function App() {
               <Route path="/" element={<Home />} />
               <Route path="/extract" element={<iframe src="http://localhost:3000" style={{ width: "100%", height: "100%", border: "none" }} title="Extract Tool" />} />
               <Route path="/shader-lab" element={<ShaderLabWrapper />} />
-              <Route path="/library" element={<StorybookPage />} />
+              <Route path="/library" element={<LibraryPage />} />
               <Route path="/storybook" element={<StorybookPage />} />
               <Route path="/builder" element={<BuilderDashboard />} />
               <Route path="/site/:siteId" element={<BuilderEditor />} />
