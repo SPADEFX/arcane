@@ -382,26 +382,24 @@ function ComponentCard({ comp, dense }: { comp: UnifiedComponent; dense: boolean
         }}
         onClick={() => setExpanded((v) => !v)}
       >
-        {/* Always show PNG when collapsed. Live render only on click-to-expand,
-            so hover doesn't remount components (avoids scroll-event hijacking
-            from useScroll / GSAP ScrollTrigger inside extracted components). */}
-        {!expanded && comp.thumbnailUrl ? (
-          <img
-            src={comp.thumbnailUrl}
-            alt={comp.name}
-            className="h-full w-full object-cover object-top"
-            loading="lazy"
-            decoding="async"
-          />
-        ) : !expanded ? (
-          // Builtin components without a thumbnail — small scaled preview
-          <div className="scale-[0.5] origin-top-left" style={{ width: "200%", height: "200%" }}>
-            {comp.source === "builtin" && comp.builtin && (
-              <DynamicRenderer slug={comp.slug} componentProps={comp.builtin.defaultProps} />
-            )}
-          </div>
+        {/* Collapsed = static (PNG or placeholder). Live render ONLY on
+            click-to-expand. Some builtins (SmoothScroll/ScrollPin/Parallax/etc.)
+            attach wheel/scroll listeners to document on mount and hijack the
+            page's trackpad scroll — so we never render them in the grid. */}
+        {!expanded ? (
+          comp.thumbnailUrl ? (
+            <img
+              src={comp.thumbnailUrl}
+              alt={comp.name}
+              className="h-full w-full object-cover object-top"
+              loading="lazy"
+              decoding="async"
+            />
+          ) : (
+            <ComponentPlaceholder name={comp.name} category={comp.category} />
+          )
         ) : (
-          // Expanded — full live render
+          // Expanded — full live render (user opted in)
           <div>
             {comp.source === "builtin" && comp.builtin ? (
               <DynamicRenderer slug={comp.slug} componentProps={comp.builtin.defaultProps} />
@@ -444,6 +442,25 @@ function ComponentCard({ comp, dense }: { comp: UnifiedComponent; dense: boolean
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function ComponentPlaceholder({ name, category }: { name: string; category: string }) {
+  // Deterministic background gradient from the name — every component
+  // gets a stable, distinguishable visual without rendering live code.
+  const hash = name.split("").reduce((a, c) => (a + c.charCodeAt(0)) % 360, 0);
+  return (
+    <div
+      className="flex h-full w-full flex-col items-center justify-center"
+      style={{
+        background: `linear-gradient(135deg, hsl(${hash} 20% 12%), hsl(${(hash + 60) % 360} 18% 8%))`,
+      }}
+    >
+      <span className="text-[10px] uppercase tracking-[0.18em] text-white/35">{category}</span>
+      <span className="mt-1 text-[12px] font-medium text-white/60 max-w-[80%] text-center truncate">
+        {name}
+      </span>
     </div>
   );
 }
