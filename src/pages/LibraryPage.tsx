@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useComponentStore } from "@/stores/component-store";
 import { bootstrapRegistry } from "@/lib/bootstrap";
 import { DynamicRenderer } from "@/components/DynamicRenderer";
@@ -24,15 +24,10 @@ interface UnifiedComponent {
   description: string;
   category: string;
   tags: string[];
-  /** Source identifier — drives preview type */
   source: "extracted" | "builtin";
-  /** Filesystem PNG URL for extracted components */
   thumbnailUrl?: string;
-  /** Original manifest, for extracted */
   manifest?: ExtractedManifest;
-  /** Original builtin definition (for DynamicRenderer fallback) */
   builtin?: ComponentDefinition;
-  /** Sort keys */
   capturedAt?: string;
   sourceUrl?: string;
 }
@@ -77,11 +72,11 @@ function pathSlug(p: string) {
 /* ─── UI Constants ────────────────────────────────────────────────────── */
 
 type DensityMode = "comfortable" | "compact" | "list";
-type SortMode = "name" | "newest" | "domain";
+type SortMode = "name" | "newest" | "domain" | "favorites";
 
 const CATEGORIES: { value: string; label: string }[] = [
   { value: "all", label: "All" },
-  // Extracted sub-categories (manifest-driven)
+  { value: "favorites", label: "★ Favorites" },
   { value: "hero", label: "Hero" },
   { value: "nav", label: "Nav" },
   { value: "footer", label: "Footer" },
@@ -92,7 +87,6 @@ const CATEGORIES: { value: string; label: string }[] = [
   { value: "testimonials", label: "Testimonials" },
   { value: "content", label: "Content" },
   { value: "other", label: "Other" },
-  // Builtin categories
   { value: "navigation", label: "Navigation" },
   { value: "interactive", label: "Interactive" },
   { value: "text-animation", label: "Text Animation" },
@@ -104,6 +98,32 @@ const CATEGORIES: { value: string; label: string }[] = [
 
 const DENSITY_LS_KEY = "library:density";
 const SORT_LS_KEY = "library:sort";
+const FAVORITES_LS_KEY = "library:favorites";
+
+/* ─── Favorites hook ──────────────────────────────────────────────────── */
+
+function useFavorites() {
+  const [favorites, setFavorites] = useState<Set<string>>(() => {
+    try {
+      const raw = localStorage.getItem(FAVORITES_LS_KEY);
+      return new Set(raw ? JSON.parse(raw) : []);
+    } catch {
+      return new Set();
+    }
+  });
+
+  const toggle = useCallback((id: string) => {
+    setFavorites((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      localStorage.setItem(FAVORITES_LS_KEY, JSON.stringify([...next]));
+      return next;
+    });
+  }, []);
+
+  return { favorites, toggle };
+}
 
 /* ─── Component ────────────────────────────────────────────────────────── */
 
@@ -118,6 +138,8 @@ export function LibraryPage() {
   const [sort, setSort] = useState<SortMode>(
     () => (localStorage.getItem(SORT_LS_KEY) as SortMode) || "name",
   );
+  const [selected, setSelected] = useState<UnifiedComponent | null>(null);
+  const { favorites, toggle: toggleFavorite } = useFavorites();
 
   useEffect(() => {
     bootstrapRegistry().then(() => load());
@@ -133,7 +155,16 @@ export function LibraryPage() {
   useEffect(() => { localStorage.setItem(DENSITY_LS_KEY, density); }, [density]);
   useEffect(() => { localStorage.setItem(SORT_LS_KEY, sort); }, [sort]);
 
-  /* Build unified list: filesystem manifests + builtin store entries */
+  // Esc closes the detail modal
+  useEffect(() => {
+    if (!selected) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSelected(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selected]);
+
   const allComponents = useMemo<UnifiedComponent[]>(() => {
     const thumbBySlug: Record<string, string> = {};
     for (const [p, url] of Object.entries(fsThumbnails)) thumbBySlug[pathSlug(p)] = url;
@@ -147,33 +178,36 @@ export function LibraryPage() {
     }
 
     const builtins = builtinComponents
-      .filter((c) => c.category !== "extracted") // filesystem extracts already cover this
+      .filter((c) => c.category !== "extracted")
       .map(toUnifiedFromBuiltin);
 
     return [...extracted, ...builtins];
   }, [builtinComponents]);
 
-  /* Filter + sort */
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     let out = allComponents.filter((c) => {
       if (source !== "all" && c.source !== source) return false;
-      if (category !== "all" && c.category !== category) return false;
+      if (category === "favorites") {
+        if (!favorites.has(c.id)) return false;
+      } else if (category !== "all" && c.category !== category) {
+        return false;
+      }
       if (!q) return true;
       const haystack = [
-        c.name,
-        c.description,
-        c.category,
-        ...c.tags,
-        c.sourceUrl || "",
-        c.slug,
-      ]
-        .join(" ")
-        .toLowerCase();
+        c.name, c.description, c.category,
+        ...c.tags, c.sourceUrl || "", c.slug,
+      ].join(" ").toLowerCase();
       return haystack.includes(q);
     });
 
-    if (sort === "name") {
+    if (sort === "favorites") {
+      out.sort((a, b) => {
+        const fa = favorites.has(a.id) ? 0 : 1;
+        const fb = favorites.has(b.id) ? 0 : 1;
+        return fa - fb || a.name.localeCompare(b.name);
+      });
+    } else if (sort === "name") {
       out.sort((a, b) => a.name.localeCompare(b.name));
     } else if (sort === "newest") {
       out.sort((a, b) => (b.capturedAt || "").localeCompare(a.capturedAt || ""));
@@ -184,90 +218,107 @@ export function LibraryPage() {
       out.sort((a, b) => domain(a).localeCompare(domain(b)) || a.name.localeCompare(b.name));
     }
     return out;
-  }, [allComponents, search, category, source, sort]);
+  }, [allComponents, search, category, source, sort, favorites]);
 
   return (
     <div className="flex h-full flex-col bg-zinc-950">
       <div className="flex-1 overflow-y-auto overscroll-contain p-8">
         <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-6 flex items-start justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-zinc-100 mb-1">Component Library</h1>
-            <p className="text-sm text-zinc-500">
-              {filtered.length} of {allComponents.length} components
-              {search && ` · "${search}"`}
-            </p>
+          {/* Header */}
+          <div className="mb-6 flex items-start justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-zinc-100 mb-1">Component Library</h1>
+              <p className="text-sm text-zinc-500">
+                {filtered.length} of {allComponents.length}
+                {favorites.size > 0 && ` · ${favorites.size} ★`}
+                {search && ` · "${search}"`}
+              </p>
+            </div>
+            <DensityToggle value={density} onChange={setDensity} />
           </div>
-          <DensityToggle value={density} onChange={setDensity} />
-        </div>
 
-        {/* Filters bar */}
-        <div className="flex flex-wrap gap-3 mb-6">
-          <input
-            type="text"
-            placeholder="Search by name, tag, description, URL…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="flex-1 min-w-[280px] bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-zinc-600 transition-colors"
-          />
-
-          <select
-            value={source}
-            onChange={(e) => setSource(e.target.value as typeof source)}
-            className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-zinc-600"
-            aria-label="Source"
-          >
-            <option value="all">Source: All</option>
-            <option value="extracted">Extracted only</option>
-            <option value="builtin">Built-in only</option>
-          </select>
-
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-zinc-600"
-            aria-label="Category"
-          >
-            {CATEGORIES.map((c) => (
-              <option key={c.value} value={c.value}>{c.label}</option>
-            ))}
-          </select>
-
-          <select
-            value={sort}
-            onChange={(e) => setSort(e.target.value as SortMode)}
-            className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-zinc-600"
-            aria-label="Sort"
-          >
-            <option value="name">Sort: Name</option>
-            <option value="newest">Sort: Newest</option>
-            <option value="domain">Sort: Domain</option>
-          </select>
-        </div>
-
-        {/* Grid / List */}
-        {loading ? (
-          <div className="text-center py-20 text-zinc-500">Loading…</div>
-        ) : filtered.length === 0 ? (
-          <div className="text-center py-20 text-zinc-500">
-            No components found
-            {search && (
-              <button
-                onClick={() => setSearch("")}
-                className="block mx-auto mt-3 text-xs text-zinc-400 underline"
-              >
-                Clear search
-              </button>
-            )}
+          {/* Filters bar */}
+          <div className="flex flex-wrap gap-3 mb-6">
+            <input
+              type="text"
+              placeholder="Search by name, tag, description, URL…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="flex-1 min-w-[280px] bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-zinc-600 transition-colors"
+            />
+            <select
+              value={source}
+              onChange={(e) => setSource(e.target.value as typeof source)}
+              className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-zinc-600"
+            >
+              <option value="all">Source: All</option>
+              <option value="extracted">Extracted only</option>
+              <option value="builtin">Built-in only</option>
+            </select>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-zinc-600"
+            >
+              {CATEGORIES.map((c) => (
+                <option key={c.value} value={c.value}>{c.label}</option>
+              ))}
+            </select>
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value as SortMode)}
+              className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-zinc-600"
+            >
+              <option value="name">Sort: Name</option>
+              <option value="favorites">Sort: Favorites first</option>
+              <option value="newest">Sort: Newest</option>
+              <option value="domain">Sort: Domain</option>
+            </select>
           </div>
-        ) : density === "list" ? (
-          <ListView items={filtered} />
-        ) : (
-          <GridView items={filtered} dense={density === "compact"} />
-        )}
+
+          {/* Grid / List */}
+          {loading ? (
+            <div className="text-center py-20 text-zinc-500">Loading…</div>
+          ) : filtered.length === 0 ? (
+            <div className="text-center py-20 text-zinc-500">
+              No components found
+              {search && (
+                <button
+                  onClick={() => setSearch("")}
+                  className="block mx-auto mt-3 text-xs text-zinc-400 underline"
+                >
+                  Clear search
+                </button>
+              )}
+            </div>
+          ) : density === "list" ? (
+            <ListView
+              items={filtered}
+              favorites={favorites}
+              onToggleFavorite={toggleFavorite}
+              onOpen={setSelected}
+            />
+          ) : (
+            <GridView
+              items={filtered}
+              dense={density === "compact"}
+              favorites={favorites}
+              onToggleFavorite={toggleFavorite}
+              onOpen={setSelected}
+            />
+          )}
         </div>
       </div>
+
+      {/* Detail modal */}
+      {selected && (
+        <DetailModal
+          comp={selected}
+          isFavorite={favorites.has(selected.id)}
+          onToggleFavorite={() => toggleFavorite(selected.id)}
+          onClose={() => setSelected(null)}
+        />
+      )}
     </div>
   );
 }
@@ -275,12 +326,8 @@ export function LibraryPage() {
 /* ─── Density toggle ──────────────────────────────────────────────────── */
 
 function DensityToggle({
-  value,
-  onChange,
-}: {
-  value: DensityMode;
-  onChange: (v: DensityMode) => void;
-}) {
+  value, onChange,
+}: { value: DensityMode; onChange: (v: DensityMode) => void }) {
   const opts: { val: DensityMode; label: string; icon: string }[] = [
     { val: "comfortable", label: "Comfortable", icon: "▢▢" },
     { val: "compact", label: "Compact", icon: "▦" },
@@ -294,21 +341,24 @@ function DensityToggle({
           onClick={() => onChange(o.val)}
           title={o.label}
           className={`px-2.5 py-1.5 text-[11px] rounded transition ${
-            value === o.val
-              ? "bg-zinc-800 text-zinc-100"
-              : "text-zinc-500 hover:text-zinc-300"
+            value === o.val ? "bg-zinc-800 text-zinc-100" : "text-zinc-500 hover:text-zinc-300"
           }`}
-        >
-          {o.icon}
-        </button>
+        >{o.icon}</button>
       ))}
     </div>
   );
 }
 
-/* ─── Grid view ───────────────────────────────────────────────────────── */
+/* ─── Grid / List ─────────────────────────────────────────────────────── */
 
-function GridView({ items, dense }: { items: UnifiedComponent[]; dense: boolean }) {
+interface ViewProps {
+  items: UnifiedComponent[];
+  favorites: Set<string>;
+  onToggleFavorite: (id: string) => void;
+  onOpen: (c: UnifiedComponent) => void;
+}
+
+function GridView({ items, dense, ...rest }: ViewProps & { dense: boolean }) {
   return (
     <div
       className={
@@ -318,25 +368,26 @@ function GridView({ items, dense }: { items: UnifiedComponent[]; dense: boolean 
       }
     >
       {items.map((c) => (
-        <ComponentCard key={c.id} comp={c} dense={dense} />
+        <ComponentCard key={c.id} comp={c} dense={dense} {...rest} />
       ))}
     </div>
   );
 }
 
-/* ─── List view ───────────────────────────────────────────────────────── */
-
-function ListView({ items }: { items: UnifiedComponent[] }) {
+function ListView({ items, favorites, onToggleFavorite, onOpen }: ViewProps) {
   return (
     <div className="border border-zinc-800 rounded-lg overflow-hidden divide-y divide-zinc-800">
       {items.map((c) => (
         <div
           key={c.id}
-          className="flex items-center gap-4 px-4 py-3 bg-zinc-900 hover:bg-zinc-800/50 transition-colors"
+          onClick={() => onOpen(c)}
+          className="group flex items-center gap-4 px-4 py-3 bg-zinc-900 hover:bg-zinc-800/50 transition-colors cursor-pointer"
         >
           <div className="h-12 w-20 flex-shrink-0 overflow-hidden rounded bg-zinc-800">
-            {c.thumbnailUrl && (
+            {c.thumbnailUrl ? (
               <img src={c.thumbnailUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+            ) : (
+              <div className="h-full w-full" style={{ background: `linear-gradient(135deg, hsl(${hashHue(c.name)} 20% 16%), hsl(${(hashHue(c.name)+60)%360} 18% 10%))` }} />
             )}
           </div>
           <div className="flex-1 min-w-0">
@@ -358,6 +409,10 @@ function ListView({ items }: { items: UnifiedComponent[] }) {
               </span>
             ))}
           </div>
+          <FavoriteButton
+            active={favorites.has(c.id)}
+            onClick={(e) => { e.stopPropagation(); onToggleFavorite(c.id); }}
+          />
         </div>
       ))}
     </div>
@@ -366,51 +421,67 @@ function ListView({ items }: { items: UnifiedComponent[] }) {
 
 /* ─── Card ────────────────────────────────────────────────────────────── */
 
-function ComponentCard({ comp, dense }: { comp: UnifiedComponent; dense: boolean }) {
-  const [expanded, setExpanded] = useState(false);
-
+function ComponentCard({
+  comp, dense, favorites, onToggleFavorite, onOpen,
+}: {
+  comp: UnifiedComponent;
+  dense: boolean;
+  favorites: Set<string>;
+  onToggleFavorite: (id: string) => void;
+  onOpen: (c: UnifiedComponent) => void;
+}) {
   const previewHeight = dense ? 110 : 160;
+  const isFavorite = favorites.has(comp.id);
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden cursor-pointer hover:border-zinc-600 transition-all hover:-translate-y-0.5 group">
+    <div
+      onClick={() => onOpen(comp)}
+      className="relative bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden cursor-pointer hover:border-zinc-600 transition-all hover:-translate-y-0.5 group"
+    >
+      {/* Hover overlay actions */}
+      <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <FavoriteButton
+          active={isFavorite}
+          onClick={(e) => { e.stopPropagation(); onToggleFavorite(comp.id); }}
+        />
+        <button
+          onClick={(e) => { e.stopPropagation(); onOpen(comp); }}
+          className="h-7 w-7 rounded-md bg-black/60 backdrop-blur border border-white/10 flex items-center justify-center hover:bg-black/80 hover:border-white/20"
+          title="Details"
+        >
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+            <circle cx="8" cy="4" r="0.8" fill="currentColor" className="text-white/80" />
+            <rect x="7" y="6.5" width="2" height="6" rx="1" fill="currentColor" className="text-white/80" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Persistent favorite indicator (when active) */}
+      {isFavorite && (
+        <div className="absolute top-2 left-2 z-10 group-hover:hidden">
+          <div className="h-6 w-6 rounded-md bg-amber-500/15 border border-amber-500/30 flex items-center justify-center">
+            <Star filled className="h-3 w-3 text-amber-400" />
+          </div>
+        </div>
+      )}
+
       {/* Preview area */}
       <div
         className="relative bg-zinc-950 border-b border-zinc-800 overflow-hidden"
-        style={{
-          height: expanded ? "auto" : `${previewHeight}px`,
-          minHeight: expanded ? 200 : undefined,
-        }}
-        onClick={() => setExpanded((v) => !v)}
+        style={{ height: `${previewHeight}px` }}
       >
-        {/* Collapsed = static (PNG or placeholder). Live render ONLY on
-            click-to-expand. Some builtins (SmoothScroll/ScrollPin/Parallax/etc.)
-            attach wheel/scroll listeners to document on mount and hijack the
-            page's trackpad scroll — so we never render them in the grid. */}
-        {!expanded ? (
-          comp.thumbnailUrl ? (
-            <img
-              src={comp.thumbnailUrl}
-              alt={comp.name}
-              className="h-full w-full object-cover object-top"
-              loading="lazy"
-              decoding="async"
-            />
-          ) : (
-            <ComponentPlaceholder name={comp.name} category={comp.category} />
-          )
+        {comp.thumbnailUrl ? (
+          <img
+            src={comp.thumbnailUrl}
+            alt={comp.name}
+            className="h-full w-full object-cover object-top"
+            loading="lazy"
+            decoding="async"
+          />
         ) : (
-          // Expanded — full live render (user opted in)
-          <div>
-            {comp.source === "builtin" && comp.builtin ? (
-              <DynamicRenderer slug={comp.slug} componentProps={comp.builtin.defaultProps} />
-            ) : comp.thumbnailUrl ? (
-              <img src={comp.thumbnailUrl} alt="" className="w-full h-auto object-contain" />
-            ) : null}
-          </div>
+          <ComponentPlaceholder name={comp.name} category={comp.category} />
         )}
-        {!expanded && (
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-zinc-900/80 pointer-events-none" />
-        )}
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-zinc-900/80 pointer-events-none" />
       </div>
 
       {/* Info */}
@@ -432,10 +503,7 @@ function ComponentCard({ comp, dense }: { comp: UnifiedComponent; dense: boolean
         {!dense && (
           <div className="flex flex-wrap gap-1">
             {comp.tags.slice(0, 4).map((tag) => (
-              <span
-                key={tag}
-                className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800/50 text-zinc-500"
-              >
+              <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800/50 text-zinc-500">
                 {tag}
               </span>
             ))}
@@ -447,9 +515,7 @@ function ComponentCard({ comp, dense }: { comp: UnifiedComponent; dense: boolean
 }
 
 function ComponentPlaceholder({ name, category }: { name: string; category: string }) {
-  // Deterministic background gradient from the name — every component
-  // gets a stable, distinguishable visual without rendering live code.
-  const hash = name.split("").reduce((a, c) => (a + c.charCodeAt(0)) % 360, 0);
+  const hash = hashHue(name);
   return (
     <div
       className="flex h-full w-full flex-col items-center justify-center"
@@ -465,10 +531,219 @@ function ComponentPlaceholder({ name, category }: { name: string; category: stri
   );
 }
 
+function hashHue(s: string) {
+  return s.split("").reduce((a, c) => (a + c.charCodeAt(0)) % 360, 0);
+}
+
 function CategoryBadge({ category }: { category: string }) {
   return (
     <span className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400 font-medium whitespace-nowrap">
       {category}
     </span>
+  );
+}
+
+/* ─── Favorite button ─────────────────────────────────────────────────── */
+
+function FavoriteButton({
+  active, onClick,
+}: { active: boolean; onClick: (e: React.MouseEvent) => void }) {
+  return (
+    <button
+      onClick={onClick}
+      title={active ? "Remove favorite" : "Add favorite"}
+      className={`h-7 w-7 rounded-md backdrop-blur border flex items-center justify-center transition-all ${
+        active
+          ? "bg-amber-500/20 border-amber-500/40 hover:bg-amber-500/30"
+          : "bg-black/60 border-white/10 hover:bg-black/80 hover:border-white/20"
+      }`}
+    >
+      <Star filled={active} className={`h-3.5 w-3.5 ${active ? "text-amber-400" : "text-white/70"}`} />
+    </button>
+  );
+}
+
+function Star({ filled, className }: { filled: boolean; className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" className={className}>
+      <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
+    </svg>
+  );
+}
+
+/* ─── Detail modal ────────────────────────────────────────────────────── */
+
+function DetailModal({
+  comp, isFavorite, onToggleFavorite, onClose,
+}: {
+  comp: UnifiedComponent;
+  isFavorite: boolean;
+  onToggleFavorite: () => void;
+  onClose: () => void;
+}) {
+  const [copied, setCopied] = useState<string | null>(null);
+
+  const copy = (text: string, key: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(key);
+      setTimeout(() => setCopied(null), 1200);
+    });
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <div
+        className="relative flex max-h-[90vh] w-full max-w-5xl overflow-hidden rounded-2xl border border-white/10 bg-zinc-950 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Close */}
+        <button
+          onClick={onClose}
+          className="absolute top-3 right-3 z-10 h-8 w-8 rounded-md bg-white/5 hover:bg-white/10 text-white/60 hover:text-white flex items-center justify-center"
+          title="Close (Esc)"
+        >
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+            <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+        </button>
+
+        {/* Left: live preview */}
+        <div className="flex-1 min-w-0 bg-zinc-950 overflow-y-auto border-r border-white/[0.06]">
+          <div className="p-6">
+            {comp.source === "builtin" && comp.builtin ? (
+              <div className="rounded-lg overflow-hidden border border-white/[0.06]">
+                <DynamicRenderer slug={comp.slug} componentProps={comp.builtin.defaultProps} />
+              </div>
+            ) : comp.thumbnailUrl ? (
+              <img
+                src={comp.thumbnailUrl}
+                alt={comp.name}
+                className="w-full rounded-lg border border-white/[0.06]"
+              />
+            ) : (
+              <ComponentPlaceholder name={comp.name} category={comp.category} />
+            )}
+          </div>
+        </div>
+
+        {/* Right: metadata + actions */}
+        <div className="w-[340px] flex-shrink-0 flex flex-col bg-zinc-900/40">
+          <div className="flex-1 overflow-y-auto p-5 space-y-4">
+            {/* Title + favorite */}
+            <div className="flex items-start gap-3">
+              <div className="flex-1 min-w-0">
+                <h2 className="text-lg font-semibold text-white">{comp.name}</h2>
+                <p className="text-xs text-white/40 mt-0.5">
+                  {comp.source === "extracted" ? "Extracted" : "Built-in"} · {comp.category}
+                </p>
+              </div>
+              <FavoriteButton active={isFavorite} onClick={onToggleFavorite} />
+            </div>
+
+            {/* Description */}
+            {comp.description && (
+              <p className="text-sm text-white/60 leading-relaxed">{comp.description}</p>
+            )}
+
+            {/* Tags */}
+            {comp.tags.length > 0 && (
+              <div>
+                <Label>Tags</Label>
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {comp.tags.map((t) => (
+                    <span key={t} className="text-[11px] px-2 py-0.5 rounded-full bg-white/[0.06] text-white/60">
+                      {t}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Source URL */}
+            {comp.sourceUrl && (
+              <MetaRow
+                label="Source"
+                value={
+                  <a
+                    href={comp.sourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-400 hover:underline truncate inline-block max-w-full"
+                  >
+                    {(() => { try { return new URL(comp.sourceUrl).hostname; } catch { return comp.sourceUrl; } })()}
+                  </a>
+                }
+              />
+            )}
+
+            {/* Captured at */}
+            {comp.capturedAt && (
+              <MetaRow
+                label="Captured"
+                value={new Date(comp.capturedAt).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}
+              />
+            )}
+
+            {/* Slug */}
+            <MetaRow label="Slug" value={<code className="text-[11px] text-white/70">{comp.slug}</code>} />
+
+            {/* Props */}
+            {comp.manifest?.propSchema && comp.manifest.propSchema.length > 0 && (
+              <div>
+                <Label>Props ({comp.manifest.propSchema.length})</Label>
+                <div className="mt-1.5 space-y-1">
+                  {comp.manifest.propSchema.map((p) => (
+                    <div key={p.name} className="flex items-center gap-2 text-[11px]">
+                      <code className="text-blue-300/80">{p.name}</code>
+                      <span className="text-white/30">{p.type}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Actions */}
+          <div className="border-t border-white/[0.06] p-4 space-y-2">
+            <button
+              onClick={() => copy(`<${comp.builtin?.slug ?? `extracted_${comp.slug}`} />`, "import")}
+              className="w-full text-left rounded-md bg-white/[0.04] hover:bg-white/[0.08] px-3 py-2 text-[12px] text-white/80"
+            >
+              {copied === "import" ? "✓ Copied" : "📋 Copy import name"}
+            </button>
+            <button
+              onClick={() => copy(comp.slug, "slug")}
+              className="w-full text-left rounded-md bg-white/[0.04] hover:bg-white/[0.08] px-3 py-2 text-[12px] text-white/80"
+            >
+              {copied === "slug" ? "✓ Copied" : "📋 Copy slug"}
+            </button>
+            {comp.source === "extracted" && (
+              <button
+                onClick={() => copy(`ui-library/components/extracted-${comp.slug}.tsx`, "path")}
+                className="w-full text-left rounded-md bg-white/[0.04] hover:bg-white/[0.08] px-3 py-2 text-[12px] text-white/80"
+              >
+                {copied === "path" ? "✓ Copied" : "📋 Copy file path"}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Label({ children }: { children: React.ReactNode }) {
+  return <span className="text-[10px] uppercase tracking-[0.18em] text-white/30 font-medium">{children}</span>;
+}
+
+function MetaRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-baseline gap-3">
+      <Label>{label}</Label>
+      <span className="text-[12px] text-white/70 truncate flex-1 text-right min-w-0">{value}</span>
+    </div>
   );
 }
