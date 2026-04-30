@@ -368,7 +368,6 @@ function ListView({ items }: { items: UnifiedComponent[] }) {
 
 function ComponentCard({ comp, dense }: { comp: UnifiedComponent; dense: boolean }) {
   const [expanded, setExpanded] = useState(false);
-  const [livePreview, setLivePreview] = useState(false);
 
   const previewHeight = dense ? 110 : 160;
 
@@ -382,11 +381,11 @@ function ComponentCard({ comp, dense }: { comp: UnifiedComponent; dense: boolean
           minHeight: expanded ? 200 : undefined,
         }}
         onClick={() => setExpanded((v) => !v)}
-        onMouseEnter={() => setLivePreview(true)}
-        onMouseLeave={() => setLivePreview(false)}
       >
-        {/* For extracted: PNG by default, swap to live render on hover */}
-        {comp.source === "extracted" && comp.thumbnailUrl && !livePreview && !expanded ? (
+        {/* Always show PNG when collapsed. Live render only on click-to-expand,
+            so hover doesn't remount components (avoids scroll-event hijacking
+            from useScroll / GSAP ScrollTrigger inside extracted components). */}
+        {!expanded && comp.thumbnailUrl ? (
           <img
             src={comp.thumbnailUrl}
             alt={comp.name}
@@ -394,14 +393,19 @@ function ComponentCard({ comp, dense }: { comp: UnifiedComponent; dense: boolean
             loading="lazy"
             decoding="async"
           />
+        ) : !expanded ? (
+          // Builtin components without a thumbnail — small scaled preview
+          <div className="scale-[0.5] origin-top-left" style={{ width: "200%", height: "200%" }}>
+            {comp.source === "builtin" && comp.builtin && (
+              <DynamicRenderer slug={comp.slug} componentProps={comp.builtin.defaultProps} />
+            )}
+          </div>
         ) : (
-          <div
-            className={expanded ? "" : "scale-[0.5] origin-top-left"}
-            style={expanded ? {} : { width: "200%", height: "200%" }}
-          >
+          // Expanded — full live render
+          <div>
             {comp.source === "builtin" && comp.builtin ? (
               <DynamicRenderer slug={comp.slug} componentProps={comp.builtin.defaultProps} />
-            ) : comp.source === "extracted" && comp.thumbnailUrl ? (
+            ) : comp.thumbnailUrl ? (
               <img src={comp.thumbnailUrl} alt="" className="w-full h-auto object-contain" />
             ) : null}
           </div>
