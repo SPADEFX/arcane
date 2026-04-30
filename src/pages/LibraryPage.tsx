@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import { useComponentStore } from "@/stores/component-store";
 import { bootstrapRegistry } from "@/lib/bootstrap";
 import { DynamicRenderer } from "@/components/DynamicRenderer";
-import type { ComponentCategory, ComponentDefinition } from "@/types/component-registry";
+import type { ComponentDefinition } from "@/types/component-registry";
 import type { ExtractedManifest } from "@/types/extracted-manifest";
 
 /* ─── Filesystem manifests (source of truth for extracted) ────────────── */
@@ -30,6 +30,18 @@ interface UnifiedComponent {
   builtin?: ComponentDefinition;
   capturedAt?: string;
   sourceUrl?: string;
+  /** Hostname extracted from sourceUrl, e.g. "stripe.com" */
+  sourceDomain?: string;
+}
+
+function extractDomain(url?: string): string | undefined {
+  if (!url) return undefined;
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, "");
+    return host || undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function toUnifiedFromManifest(
@@ -48,6 +60,7 @@ function toUnifiedFromManifest(
     manifest,
     capturedAt: manifest.capturedAt,
     sourceUrl: manifest.sourceUrl,
+    sourceDomain: extractDomain(manifest.sourceUrl),
   };
 }
 
@@ -132,6 +145,7 @@ export function LibraryPage() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<string>("all");
   const [source, setSource] = useState<"all" | "extracted" | "builtin">("all");
+  const [domain, setDomain] = useState<string>("all");
   const [density, setDensity] = useState<DensityMode>(
     () => (localStorage.getItem(DENSITY_LS_KEY) as DensityMode) || "comfortable",
   );
@@ -184,10 +198,20 @@ export function LibraryPage() {
     return [...extracted, ...builtins];
   }, [builtinComponents]);
 
+  /* Build the list of unique domains for the filter dropdown */
+  const allDomains = useMemo(() => {
+    const set = new Set<string>();
+    for (const c of allComponents) {
+      if (c.sourceDomain) set.add(c.sourceDomain);
+    }
+    return [...set].sort();
+  }, [allComponents]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     let out = allComponents.filter((c) => {
       if (source !== "all" && c.source !== source) return false;
+      if (domain !== "all" && c.sourceDomain !== domain) return false;
       if (category === "favorites") {
         if (!favorites.has(c.id)) return false;
       } else if (category !== "all" && c.category !== category) {
@@ -196,7 +220,7 @@ export function LibraryPage() {
       if (!q) return true;
       const haystack = [
         c.name, c.description, c.category,
-        ...c.tags, c.sourceUrl || "", c.slug,
+        ...c.tags, c.sourceUrl || "", c.slug, c.sourceDomain || "",
       ].join(" ").toLowerCase();
       return haystack.includes(q);
     });
@@ -255,6 +279,19 @@ export function LibraryPage() {
               <option value="extracted">Extracted only</option>
               <option value="builtin">Built-in only</option>
             </select>
+            {allDomains.length > 0 && (
+              <select
+                value={domain}
+                onChange={(e) => setDomain(e.target.value)}
+                className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-zinc-600"
+                title="Filter by source site"
+              >
+                <option value="all">Site: All</option>
+                {allDomains.map((d) => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+            )}
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value)}
@@ -297,6 +334,7 @@ export function LibraryPage() {
               favorites={favorites}
               onToggleFavorite={toggleFavorite}
               onOpen={setSelected}
+              onPickDomain={setDomain}
             />
           ) : (
             <GridView
@@ -305,6 +343,7 @@ export function LibraryPage() {
               favorites={favorites}
               onToggleFavorite={toggleFavorite}
               onOpen={setSelected}
+              onPickDomain={setDomain}
             />
           )}
         </div>
@@ -356,6 +395,7 @@ interface ViewProps {
   favorites: Set<string>;
   onToggleFavorite: (id: string) => void;
   onOpen: (c: UnifiedComponent) => void;
+  onPickDomain: (d: string) => void;
 }
 
 function GridView({ items, dense, ...rest }: ViewProps & { dense: boolean }) {
@@ -374,7 +414,7 @@ function GridView({ items, dense, ...rest }: ViewProps & { dense: boolean }) {
   );
 }
 
-function ListView({ items, favorites, onToggleFavorite, onOpen }: ViewProps) {
+function ListView({ items, favorites, onToggleFavorite, onOpen, onPickDomain }: ViewProps) {
   return (
     <div className="border border-zinc-800 rounded-lg overflow-hidden divide-y divide-zinc-800">
       {items.map((c) => (
@@ -394,8 +434,14 @@ function ListView({ items, favorites, onToggleFavorite, onOpen }: ViewProps) {
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium text-zinc-100 truncate">{c.name}</span>
               <CategoryBadge category={c.category} />
-              {c.source === "extracted" && (
-                <span className="text-[9px] uppercase tracking-wider text-zinc-600">extracted</span>
+              {c.sourceDomain && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onPickDomain(c.sourceDomain!); }}
+                  className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-300/80 border border-blue-500/15 hover:bg-blue-500/20 hover:text-blue-200"
+                  title={`Filter by ${c.sourceDomain}`}
+                >
+                  {c.sourceDomain}
+                </button>
               )}
             </div>
             {c.description && (
@@ -422,13 +468,14 @@ function ListView({ items, favorites, onToggleFavorite, onOpen }: ViewProps) {
 /* ─── Card ────────────────────────────────────────────────────────────── */
 
 function ComponentCard({
-  comp, dense, favorites, onToggleFavorite, onOpen,
+  comp, dense, favorites, onToggleFavorite, onOpen, onPickDomain,
 }: {
   comp: UnifiedComponent;
   dense: boolean;
   favorites: Set<string>;
   onToggleFavorite: (id: string) => void;
   onOpen: (c: UnifiedComponent) => void;
+  onPickDomain: (d: string) => void;
 }) {
   const previewHeight = dense ? 110 : 160;
   const isFavorite = favorites.has(comp.id);
@@ -495,6 +542,18 @@ function ComponentCard({
           </h3>
           <CategoryBadge category={comp.category} />
         </div>
+
+        {/* Source domain — clickable to filter, sits under the title */}
+        {comp.sourceDomain && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onPickDomain(comp.sourceDomain!); }}
+            className="mb-2 text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-300/80 border border-blue-500/15 hover:bg-blue-500/20 hover:text-blue-200"
+            title={`Filter by ${comp.sourceDomain}`}
+          >
+            {comp.sourceDomain}
+          </button>
+        )}
+
         {!dense && comp.description && (
           <p className="text-xs text-zinc-500 leading-relaxed mb-2 line-clamp-2">
             {comp.description}
@@ -581,14 +640,24 @@ function DetailModal({
   onToggleFavorite: () => void;
   onClose: () => void;
 }) {
-  const [copied, setCopied] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
-  const copy = (text: string, key: string) => {
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(key);
-      setTimeout(() => setCopied(null), 1200);
-    });
-  };
+  async function handleDelete() {
+    if (comp.source !== "extracted") return;
+    if (!confirm(`Delete "${comp.name}"? This removes the .tsx, .html, .css, .png, .json and story file.`)) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`http://localhost:3000/api/extracted/${comp.slug}`, { method: "DELETE" });
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error || "delete failed");
+      // Vite HMR will pick up the file removals; reload to reflect immediately.
+      onClose();
+      setTimeout(() => location.reload(), 300);
+    } catch (e) {
+      alert(`Delete failed: ${(e as Error).message}`);
+      setDeleting(false);
+    }
+  }
 
   return (
     <div
@@ -631,16 +700,13 @@ function DetailModal({
 
         {/* Right: metadata + actions */}
         <div className="w-[340px] flex-shrink-0 flex flex-col bg-zinc-900/40">
-          <div className="flex-1 overflow-y-auto p-5 space-y-4">
-            {/* Title + favorite */}
-            <div className="flex items-start gap-3">
-              <div className="flex-1 min-w-0">
-                <h2 className="text-lg font-semibold text-white">{comp.name}</h2>
-                <p className="text-xs text-white/40 mt-0.5">
-                  {comp.source === "extracted" ? "Extracted" : "Built-in"} · {comp.category}
-                </p>
-              </div>
-              <FavoriteButton active={isFavorite} onClick={onToggleFavorite} />
+          <div className="flex-1 overflow-y-auto p-5 pr-12 space-y-4">
+            {/* Title (close button sits in top-right of modal — give it room) */}
+            <div>
+              <h2 className="text-lg font-semibold text-white pr-4">{comp.name}</h2>
+              <p className="text-xs text-white/40 mt-0.5">
+                {comp.source === "extracted" ? "Extracted" : "Built-in"} · {comp.category}
+              </p>
             </div>
 
             {/* Description */}
@@ -687,45 +753,40 @@ function DetailModal({
               />
             )}
 
-            {/* Slug */}
-            <MetaRow label="Slug" value={<code className="text-[11px] text-white/70">{comp.slug}</code>} />
-
-            {/* Props */}
-            {comp.manifest?.propSchema && comp.manifest.propSchema.length > 0 && (
-              <div>
-                <Label>Props ({comp.manifest.propSchema.length})</Label>
-                <div className="mt-1.5 space-y-1">
-                  {comp.manifest.propSchema.map((p) => (
-                    <div key={p.name} className="flex items-center gap-2 text-[11px]">
-                      <code className="text-blue-300/80">{p.name}</code>
-                      <span className="text-white/30">{p.type}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Actions */}
           <div className="border-t border-white/[0.06] p-4 space-y-2">
             <button
-              onClick={() => copy(`<${comp.builtin?.slug ?? `extracted_${comp.slug}`} />`, "import")}
-              className="w-full text-left rounded-md bg-white/[0.04] hover:bg-white/[0.08] px-3 py-2 text-[12px] text-white/80"
+              onClick={onToggleFavorite}
+              className={`w-full flex items-center justify-center gap-2 rounded-md px-3 py-2.5 text-[13px] font-medium transition ${
+                isFavorite
+                  ? "bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30"
+                  : "bg-white/[0.06] hover:bg-white/[0.10] text-white/80 border border-white/[0.06]"
+              }`}
             >
-              {copied === "import" ? "✓ Copied" : "📋 Copy import name"}
+              <Star filled={isFavorite} className="h-4 w-4" />
+              {isFavorite ? "Favorite" : "Add to favorites"}
             </button>
-            <button
-              onClick={() => copy(comp.slug, "slug")}
-              className="w-full text-left rounded-md bg-white/[0.04] hover:bg-white/[0.08] px-3 py-2 text-[12px] text-white/80"
-            >
-              {copied === "slug" ? "✓ Copied" : "📋 Copy slug"}
-            </button>
+
+            {comp.sourceUrl && (
+              <a
+                href={comp.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full flex items-center justify-center gap-2 rounded-md bg-white/[0.04] hover:bg-white/[0.08] px-3 py-2.5 text-[13px] text-white/80 border border-white/[0.06]"
+              >
+                ↗ Open source page
+              </a>
+            )}
+
             {comp.source === "extracted" && (
               <button
-                onClick={() => copy(`ui-library/components/extracted-${comp.slug}.tsx`, "path")}
-                className="w-full text-left rounded-md bg-white/[0.04] hover:bg-white/[0.08] px-3 py-2 text-[12px] text-white/80"
+                onClick={handleDelete}
+                disabled={deleting}
+                className="w-full rounded-md bg-red-500/10 hover:bg-red-500/20 disabled:opacity-50 px-3 py-2.5 text-[13px] text-red-400 border border-red-500/20"
               >
-                {copied === "path" ? "✓ Copied" : "📋 Copy file path"}
+                {deleting ? "Deleting…" : "🗑  Delete component"}
               </button>
             )}
           </div>

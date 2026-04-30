@@ -1013,6 +1013,40 @@ export const Default: Story = {};
   });
 }
 
+async function handleDeleteExtracted(req, res) {
+  // URL: /api/extracted/:slug
+  const slug = decodeURIComponent(req.url.replace(/^\/api\/extracted\//, ""));
+  if (!slug || /[/\\]/.test(slug)) return sendJson(res, 400, { error: "invalid slug" });
+
+  const studioRoot = path.join(__dirname, "..");
+  const componentsDir = path.join(studioRoot, "ui-library", "components");
+  const storiesDir = path.join(studioRoot, "ui-library", "stories");
+
+  const targets = [
+    path.join(componentsDir, `extracted-${slug}.tsx`),
+    path.join(componentsDir, `extracted-${slug}.css`),
+    path.join(componentsDir, `extracted-${slug}.html`),
+    path.join(componentsDir, `extracted-${slug}.png`),
+    path.join(componentsDir, `extracted-${slug}.json`),
+    path.join(storiesDir, `extracted-${slug}.stories.tsx`),
+  ];
+
+  const removed = [];
+  const errors = [];
+  for (const f of targets) {
+    try {
+      await fs.promises.unlink(f);
+      removed.push(path.basename(f));
+    } catch (e) {
+      // ENOENT is fine — file just didn't exist.
+      if (e.code !== "ENOENT") errors.push({ file: path.basename(f), error: e.message });
+    }
+  }
+
+  if (removed.length === 0) return sendJson(res, 404, { ok: false, error: "no files found for slug " + slug });
+  sendJson(res, 200, { ok: true, removed, errors });
+}
+
 async function handleExportSite(req, res) {
   let body = "";
   req.on("data", (c) => { body += c; });
@@ -1038,6 +1072,13 @@ async function handleExportSite(req, res) {
 }
 
 const server = http.createServer((req, res) => {
+  // CORS — Studio (:3333) calls this server (:3000) for delete/etc.
+  const origin = req.headers.origin || "*";
+  res.setHeader("Access-Control-Allow-Origin", origin);
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  if (req.method === "OPTIONS") { res.writeHead(204); res.end(); return; }
+
   if (req.method === "POST" && req.url === "/api/extract") return handleExtract(req, res);
   if (req.method === "POST" && req.url === "/api/record") return handleRecord(req, res);
   if (req.method === "POST" && req.url === "/api/convert") return handleConvert(req, res);
@@ -1050,6 +1091,7 @@ const server = http.createServer((req, res) => {
   if (req.method === "POST" && req.url === "/api/surgical-extract") return handleSurgicalExtract(req, res);
   if (req.method === "POST" && req.url === "/api/extract-to-component") return handleExtractToComponent(req, res);
   if (req.method === "POST" && req.url === "/api/save-to-library") return handleSaveToLibrary(req, res);
+  if (req.method === "DELETE" && req.url.startsWith("/api/extracted/")) return handleDeleteExtracted(req, res);
   if (req.method === "POST" && req.url === "/api/export-site") return handleExportSite(req, res);
   if (req.method === "GET" && req.url === "/api/progress") return handleProgress(req, res);
   if (req.method === "GET" && req.url.startsWith("/api/clone-files")) return handleCloneFiles(req, res);
