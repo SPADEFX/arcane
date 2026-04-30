@@ -57,6 +57,101 @@ const SLUG_PROPS: Record<string, Record<string, unknown>> = {
   "parallax-layer": { children: "Parallax" },
   skeleton: {},
   dialog: {},
+
+  /* ── Sections (most need props or they crash on .length / .map) ── */
+  "hero-section": {
+    headline: "Build premium marketing sites",
+    highlightText: "in days, not weeks.",
+    subheadline: "A component library with micro-interactions, scroll animations and a real design system.",
+    ctaLabel: "Get Started",
+    secondaryLabel: "View Docs",
+  },
+  "hero-spotlight": {
+    badge: "Components · Motion · Tokens",
+    headline: "The design system that ships.",
+    highlightText: "Premium sites.",
+    subheadline: "57 components, micro-interactions, scroll animations, token-driven design.",
+    ctaLabel: "Browse",
+    secondaryLabel: "GitHub",
+  },
+  "hero-split": {
+    headline: "Components that feel considered,",
+    highlightText: "not generated.",
+    subheadline: "Real type pairings. Deliberate spacing. Motion that matches context.",
+    ctaLabel: "Explore",
+    features: [
+      { text: "GPU-accelerated 60fps animations" },
+      { text: "Light + Dark, designed not inverted" },
+      { text: "Token-driven, rebrand in 10 vars" },
+    ],
+  },
+  "hero-bento": { gradient: false },
+  "hero-aurora": {
+    headline: "Not another landing page builder.",
+    highlightText: "A design weapon.",
+    subheadline: "57 components. 15 typefaces. GPU-only motion.",
+    ctaLabel: "Get Access",
+    colorScheme: "blue",
+    grain: true,
+  },
+  "hero-rotating": {
+    headlinePrefix: "Make it",
+    rotatingWords: ["considered", "intentional", "yours"],
+    ctaLabel: "Browse",
+    animation: "slide",
+    interval: 2800,
+  },
+  "cta-section": {
+    headline: "Ready to ship faster?",
+    subheadline: "Start building premium marketing sites today.",
+    ctaLabel: "Start free",
+    secondaryLabel: "Read docs",
+    variant: "gradient",
+  },
+  "faq-section": {
+    headline: "Frequently asked",
+    items: [
+      { question: "How do I get started?", answer: "Install the package and import the components you need." },
+      { question: "Is it accessible?", answer: "Yes. Keyboard, screen readers, reduced motion all respected." },
+      { question: "Can I customize themes?", answer: "Override 10 CSS variables and rebrand the whole library." },
+    ],
+  },
+  "feature-grid": {
+    headline: "Everything you need",
+    subheadline: "Premium components and a token-driven design system.",
+    columns: 3,
+    features: [
+      { title: "Fast", description: "Compositor-friendly animations." },
+      { title: "Accessible", description: "ARIA patterns built in." },
+      { title: "Token-driven", description: "10 CSS vars to rebrand." },
+    ],
+  },
+  testimonials: {
+    headline: "Loved by developers",
+    columns: 3,
+    testimonials: [
+      { quote: "Cut our build time from 2 weeks to 3 days.", author: "Sarah Chen", role: "Design Lead" },
+      { quote: "The motion doctrine is genius.", author: "Marcus Johnson", role: "Freelance Dev" },
+      { quote: "Accessibility built in, not bolted on.", author: "Emma Rodriguez", role: "CTO" },
+    ],
+  },
+  "pricing-table": {
+    headline: "Simple, transparent pricing",
+    plans: [
+      { name: "Starter", description: "For side projects", monthlyPrice: 0, yearlyPrice: 0, ctaLabel: "Free", features: [{ text: "5 components", included: true }] },
+      { name: "Pro", description: "For freelancers", monthlyPrice: 29, yearlyPrice: 23, popular: true, ctaLabel: "Start Pro", features: [{ text: "All components", included: true }] },
+    ],
+  },
+  footer: {
+    logo: "Brand",
+    description: "A component library for premium marketing sites.",
+    columns: [
+      { title: "Product", links: [{ label: "Features", href: "#" }, { label: "Pricing", href: "#" }] },
+      { title: "Resources", links: [{ label: "Docs", href: "#" }, { label: "GitHub", href: "#" }] },
+    ],
+    bottomText: "© 2026 Brand. All rights reserved.",
+  },
+  "section-divider": { variant: "wave" },
 };
 
 /* Components that just don't show anything visible standalone — show a hint */
