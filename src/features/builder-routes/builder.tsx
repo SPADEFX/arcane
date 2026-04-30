@@ -27,11 +27,21 @@ export function Builder() {
   const { addBlock, moveBlock } = useSiteStore();
   const [draggedType, setDraggedType] = useState<string | null>(null);
   const [blocksReady, setBlocksReady] = useState(false);
+  const [, setBlocksVersion] = useState(0);
 
   // Load extracted components from IndexedDB + set title
   useEffect(() => {
     document.title = "Builder";
     loadExtractedBlocks().then(() => setBlocksReady(true));
+
+    // Re-load when a new component is extracted (postMessage from Extract Tool iframe)
+    const handler = (e: MessageEvent) => {
+      if (e.data?.type === "arcane-save-component") {
+        loadExtractedBlocks().then(() => setBlocksVersion((v) => v + 1));
+      }
+    };
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
   }, []);
 
   // Undo / Redo keyboard shortcuts

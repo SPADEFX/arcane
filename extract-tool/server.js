@@ -163,9 +163,9 @@ async function handleExtract(req, res) {
       // the static file server. We return the URL instead of the HTML blob.
       const cloneUrl = data.cloneId ? `/clones/${data.cloneId}/index.html` : null;
       const html = cloneUrl ? data.rawHtml : (data.rawHtml || buildHtml(data));
-      // Cache CSS for conversion endpoint (don't send raw data to client — too heavy).
-      lastCapturedCss = (data.cssRules || []).map((r) => r.selector + "{" + r.cssText + "}").join("\n");
-      lastReverseData = data.reverseData || null;
+      // Cache CSS+reverseData per source URL with TTL — avoids cross-request bleed.
+      const cssRulesStr = (data.cssRules || []).map((r) => r.selector + "{" + r.cssText + "}").join("\n");
+      cachePut(parsed.url, { cssRules: cssRulesStr, reverseData: data.reverseData || null });
       setProgress("Terminé", 100, "Envoi des résultats...");
       clearProgress();
       sendJson(res, 200, {
@@ -239,8 +239,46 @@ async function handleRecord(req, res) {
 // ── Proxy mode: spin up a reverse proxy for a target URL ──────────────────
 const proxies = new Map(); // url → { port, process }
 let nextProxyPort = 4001;
-let lastCapturedCss = "";
-let lastReverseData = null;
+
+// Capture cache — bounded TTL Map keyed by source URL.
+// Replaces the unbounded module-level globals that leaked across requests
+// and broke parallel captures.
+const CAPTURE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const captureCache = new Map(); // url → { cssRules, reverseData, expiresAt }
+
+function cacheGet(url) {
+  if (!url) return null;
+  const entry = captureCache.get(url);
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) {
+    captureCache.delete(url);
+    return null;
+  }
+  return entry;
+}
+
+function cachePut(url, data) {
+  if (!url) return;
+  captureCache.set(url, { ...data, expiresAt: Date.now() + CAPTURE_TTL_MS });
+  // Evict expired entries opportunistically (cheap, runs once per write).
+  if (captureCache.size > 100) {
+    const now = Date.now();
+    for (const [k, v] of captureCache) {
+      if (now > v.expiresAt) captureCache.delete(k);
+    }
+  }
+}
+
+// Backward-compat shims — old code paths read `lastCapturedCss` / `lastReverseData`.
+// These now read from the most recently inserted cache entry.
+function getLastCapture() {
+  let latest = null;
+  let latestExpiry = 0;
+  for (const v of captureCache.values()) {
+    if (v.expiresAt > latestExpiry) { latest = v; latestExpiry = v.expiresAt; }
+  }
+  return latest || { cssRules: "", reverseData: null };
+}
 
 async function handleProxy(req, res) {
   let body = "";
@@ -281,7 +319,7 @@ async function handleConvert(req, res) {
       const { html, css, language } = JSON.parse(body);
       if (!html || !language) return sendJson(res, 400, { error: "missing html or language" });
       let result, mode;
-      const effectiveCss = css || lastCapturedCss || "";
+      const effectiveCss = css || getLastCapture().cssRules || "";
       if (getApiKey()) {
         const trimHtml = html.length > 30000 ? html.slice(0, 30000) + "\n<!-- truncated -->" : html;
         const trimCss = effectiveCss.length > 15000 ? effectiveCss.slice(0, 15000) : effectiveCss;
@@ -353,7 +391,7 @@ async function handleRecreate(req, res) {
   req.on("end", async () => {
     try {
       const parsed = JSON.parse(body);
-      const reverseData = parsed.reverseData || lastReverseData;
+      const reverseData = parsed.reverseData || getLastCapture().reverseData;
       const { tokens, language, prompt } = parsed;
       if (!getApiKey()) return sendJson(res, 200, { ok: false, error: "ANTHROPIC_API_KEY non définie." });
       const { callClaude } = require("./lib/ai");
@@ -800,7 +838,13 @@ function handleCloneFiles(req, res) {
 async function handleSaveToLibrary(req, res) {
   let body = "";
   req.on("data", (c) => { body += c; if (body.length > 5e6) req.destroy(); });
-  req.on("end", () => {
+  req.on("end", async () => {
+    // Async write helper — atomic via tmp file + rename.
+    async function atomicWrite(filePath, data) {
+      const tmp = filePath + ".tmp";
+      await fs.promises.writeFile(tmp, data);
+      await fs.promises.rename(tmp, filePath);
+    }
     try {
       let { name, slug, tsx, css: rawCss, rawHtml: rawH, props, screenshot, description, sourceUrl } = JSON.parse(body);
       if (!name || !slug) return sendJson(res, 400, { error: "missing name or slug" });
@@ -827,13 +871,13 @@ async function handleSaveToLibrary(req, res) {
         } catch(e) {}
       }
 
-      // 1. Write the component file
+      // 1. Write the component file (async + atomic)
       const compFile = path.join(componentsDir, `extracted-${slug}.tsx`);
-      fs.writeFileSync(compFile, tsx || `// Extracted: ${name}\nexport function ${name}() { return null; }`);
+      await atomicWrite(compFile, tsx || `// Extracted: ${name}\nexport function ${name}() { return null; }`);
 
       // 2. Write the CSS file (if any)
       if (css && css.trim()) {
-        fs.writeFileSync(path.join(componentsDir, `extracted-${slug}.css`), css);
+        await atomicWrite(path.join(componentsDir, `extracted-${slug}.css`), css);
       }
 
       // 3. Extract @import URLs for font loading
@@ -853,7 +897,7 @@ async function handleSaveToLibrary(req, res) {
       // Save CSS and HTML as separate files (avoids template literal escaping issues)
       const cssFile = `extracted-${slug}.css`;
       const htmlFile = `extracted-${slug}.html`;
-      fs.writeFileSync(path.join(componentsDir, htmlFile), rawHtml || "");
+      await atomicWrite(path.join(componentsDir, htmlFile), rawHtml || "");
 
       const storyContent = `import type { Meta, StoryObj } from "@storybook/react";
 import { useEffect, useRef, useState } from "react";
@@ -885,13 +929,73 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 `;
-      fs.writeFileSync(path.join(storiesDir, `extracted-${slug}.stories.tsx`), storyContent);
+      await atomicWrite(path.join(storiesDir, `extracted-${slug}.stories.tsx`), storyContent);
 
       // 4. Save screenshot as thumbnail
+      let thumbnailWritten = false;
       if (screenshot && screenshot.startsWith("data:image")) {
         const b64 = screenshot.replace(/^data:image\/\w+;base64,/, "");
-        fs.writeFileSync(path.join(componentsDir, `extracted-${slug}.png`), Buffer.from(b64, "base64"));
+        await atomicWrite(path.join(componentsDir, `extracted-${slug}.png`), Buffer.from(b64, "base64"));
+        thumbnailWritten = true;
       }
+
+      // 5. Auto-classify with Claude Haiku (vision LLM).
+      // Returns { name, slug, category, description, tags } or null on failure.
+      let classified = null;
+      if (screenshot && screenshot.startsWith("data:image")) {
+        try {
+          const { classify } = require("./lib/auto-classify");
+          const b64 = screenshot.replace(/^data:image\/\w+;base64,/, "");
+          classified = await classify({
+            screenshotBase64: b64,
+            html: rawHtml,
+            sourceUrl,
+          });
+        } catch (e) {
+          console.warn("[save-to-library] auto-classify error:", e.message);
+        }
+      }
+
+      // 6. Build manifest — LLM-derived metadata wins over defaults.
+      const propSchema = (props || []).map((p) => ({
+        name: p.name,
+        label: p.label || p.name,
+        type:
+          p.type === "image" ? "image" :
+          p.type === "href"  ? "text" :
+          p.type === "boolean" ? "boolean" :
+          p.type === "textarea" ? "textarea" : "text",
+        defaultValue: p.defaultValue,
+        tsType: p.tsType,
+      }));
+
+      const defaultPropsFromSchema = {};
+      for (const p of (props || [])) {
+        if (p.defaultValue !== undefined) defaultPropsFromSchema[p.name] = p.defaultValue;
+      }
+
+      const manifest = {
+        schemaVersion: 1,
+        slug,
+        name: classified?.name || name,
+        version: 1,
+        description: classified?.description || description || "",
+        category: classified?.category || "other",
+        tags: classified?.tags?.length ? classified.tags : ["extracted"],
+        sourceUrl: sourceUrl || "",
+        capturedAt: new Date().toISOString(),
+        propSchema,
+        defaultProps: defaultPropsFromSchema,
+        files: {
+          component: `extracted-${slug}.tsx`,
+          html: `extracted-${slug}.html`,
+          css: css && css.trim() ? `extracted-${slug}.css` : undefined,
+          thumbnail: thumbnailWritten ? `extracted-${slug}.png` : undefined,
+        },
+      };
+
+      const manifestPath = path.join(componentsDir, `extracted-${slug}.json`);
+      await atomicWrite(manifestPath, JSON.stringify(manifest, null, 2));
 
       sendJson(res, 200, {
         ok: true,
@@ -899,7 +1003,9 @@ export const Default: Story = {};
           component: `ui-library/components/extracted-${slug}.tsx`,
           css: css ? `ui-library/components/extracted-${slug}.css` : null,
           story: `ui-library/stories/extracted-${slug}.stories.tsx`,
+          manifest: `ui-library/components/extracted-${slug}.json`,
         },
+        manifest,
       });
     } catch (e) {
       sendJson(res, 500, { error: String(e.message || e) });

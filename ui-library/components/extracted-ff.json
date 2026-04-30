@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "slug": "ff",
+  "name": "Ff",
+  "version": 1,
+  "description": "",
+  "category": "other",
+  "tags": [
+    "extracted",
+    "backfilled"
+  ],
+  "sourceUrl": "",
+  "capturedAt": "2026-04-30T18:12:04.320Z",
+  "propSchema": [
+    {
+      "name": "description",
+      "label": "Paragraph",
+      "type": "textarea",
+      "tsType": "string"
+    },
+    {
+      "name": "ctaLabel",
+      "label": "Button text",
+      "type": "text",
+      "tsType": "string"
+    },
+    {
+      "name": "buttonLabel1",
+      "label": "Button text",
+      "type": "text",
+      "tsType": "string"
+    },
+    {
+      "name": "buttonLabel2",
+      "label": "Button text",
+      "type": "text",
+      "tsType": "string"
+    },
+    {
+      "name": "ctaHref",
+      "label": "Link URL",
+      "type": "text",
+      "tsType": "string"
+    },
+    {
+      "name": "link1Href",
+      "label": "Link URL",
+      "type": "text",
+      "tsType": "string"
+    },
+    {
+      "name": "link2Href",
+      "label": "Link URL",
+      "type": "text",
+      "tsType": "string"
+    }
+  ],
+  "defaultProps": {},
+  "files": {
+    "component": "extracted-ff.tsx",
+    "html": "extracted-ff.html",
+    "css": "extracted-ff.css",
+    "thumbnail": "extracted-ff.png"
+  }
+}

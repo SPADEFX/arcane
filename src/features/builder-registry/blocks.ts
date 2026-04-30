@@ -709,45 +709,108 @@ export const blockDefinitions: BlockDefinition[] = [
 
 export const blockMap = new Map(blockDefinitions.map((b) => [b.type, b]));
 
-// ── Load extracted components from IndexedDB into the registry ──────
+// ─── Load extracted components from filesystem (source of truth) ───────
+//
+// Each extracted component has a sidecar JSON manifest with metadata
+// (name, category, tags, propSchema, defaultProps, sourceUrl, etc.).
+// We scan three globs: manifests (.json), html, css. Components without
+// a manifest fall back to slug-derived defaults (legacy support).
+//
+// All files are committed to git → synced across machines automatically.
+// Vite HMR re-runs the glob on file changes, so newly-extracted components
+// appear after a page refresh.
 import { createExtractedBlock } from "../builder-components/extracted-block";
+import type { ExtractedManifest } from "@/types/extracted-manifest";
 
-export async function loadExtractedBlocks(): Promise<number> {
-  return new Promise((resolve) => {
-    const req = indexedDB.open("arcane", 1);
-    req.onerror = () => resolve(0);
-    req.onsuccess = () => {
-      const db = req.result;
-      if (!db.objectStoreNames.contains("components")) { resolve(0); return; }
-      const tx = db.transaction("components", "readonly");
-      const store = tx.objectStore("components");
-      const getAll = store.getAll();
-      getAll.onsuccess = () => {
-        const components = getAll.result || [];
-        let added = 0;
-        for (const comp of components) {
-          if (!comp.code || !comp.css) continue;
-          const type = "extracted_" + comp.slug;
-          if (blockMap.has(type)) continue;
-          const def: BlockDefinition = {
-            type,
-            label: comp.name || comp.slug,
-            category: "extracted" as BlockCategory,
-            component: createExtractedBlock(comp.code, comp.css, comp.rawHtml),
-            defaultProps: comp.defaultProps || {},
-            propSchema: (comp.props || []).map((p: any) => ({
-              key: p.name,
-              label: p.label || p.name,
-              type: p.type === "image" ? "image" : p.type === "href" ? "text" : "text",
-            })),
-          };
-          blockDefinitions.push(def);
-          blockMap.set(type, def);
-          added++;
-        }
-        resolve(added);
-      };
-      getAll.onerror = () => resolve(0);
+const fsHtml = import.meta.glob(
+  "../../../ui-library/components/extracted-*.html",
+  { query: "?raw", import: "default", eager: true },
+) as Record<string, string>;
+
+const fsCss = import.meta.glob(
+  "../../../ui-library/components/extracted-*.css",
+  { query: "?raw", import: "default", eager: true },
+) as Record<string, string>;
+
+const fsManifests = import.meta.glob(
+  "../../../ui-library/components/extracted-*.json",
+  { eager: true },
+) as Record<string, { default: ExtractedManifest } | ExtractedManifest>;
+
+function slugFromPath(p: string): string {
+  const m = p.match(/extracted-([^/]+)\.(html|css|json)$/);
+  return m ? m[1] : "";
+}
+
+function pascal(slug: string): string {
+  return slug
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/[-_]+/g, " ")
+    .split(" ")
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function loadExtractedFromFs(): number {
+  // Build slug-keyed lookups
+  const htmlBySlug: Record<string, string> = {};
+  const cssBySlug: Record<string, string> = {};
+  const manifestBySlug: Record<string, ExtractedManifest> = {};
+  for (const [p, content] of Object.entries(fsHtml)) htmlBySlug[slugFromPath(p)] = content;
+  for (const [p, content] of Object.entries(fsCss)) cssBySlug[slugFromPath(p)] = content;
+  for (const [p, mod] of Object.entries(fsManifests)) {
+    const m = (mod as { default?: ExtractedManifest }).default ?? (mod as ExtractedManifest);
+    if (m && typeof m === "object" && "slug" in m) manifestBySlug[slugFromPath(p)] = m;
+  }
+
+  // Union of all slugs found across html/manifest sources
+  const slugs = new Set<string>([...Object.keys(htmlBySlug), ...Object.keys(manifestBySlug)]);
+
+  let added = 0;
+  for (const slug of slugs) {
+    if (!slug) continue;
+    const type = "extracted_" + slug;
+    if (blockMap.has(type)) continue;
+
+    const html = htmlBySlug[slug];
+    const css = cssBySlug[slug] || "";
+    if (!html) continue;
+
+    const manifest = manifestBySlug[slug];
+
+    const def: BlockDefinition = {
+      type,
+      label: manifest?.name || pascal(slug),
+      category: "extracted" as BlockCategory,
+      component: createExtractedBlock("", css, html),
+      defaultProps: manifest?.defaultProps || {},
+      propSchema: (manifest?.propSchema || []).map((p) => ({
+        key: p.name,
+        label: p.label,
+        type: p.type === "image"
+          ? "image"
+          : p.type === "boolean"
+          ? "boolean"
+          : p.type === "textarea"
+          ? "textarea"
+          : "text",
+      })),
     };
-  });
+    blockDefinitions.push(def);
+    blockMap.set(type, def);
+    added++;
+  }
+  return added;
+}
+
+// Auto-load on module init — synchronous, runs once before any consumer.
+loadExtractedFromFs();
+
+// Public API kept for backward compat. Callers (builder.tsx, App.tsx) still
+// invoke this to trigger a re-scan after a postMessage from Extract Tool.
+// Vite HMR will have already updated the glob, so the re-scan picks up new
+// files automatically.
+export async function loadExtractedBlocks(): Promise<number> {
+  return loadExtractedFromFs();
 }

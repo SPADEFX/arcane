@@ -1,5 +1,7 @@
 // Code Generation — transforms surgical extraction output into a clean React component.
-// HTML → JSX, CSS → scoped styles, WAAPI → Framer Motion variants, props detection.
+// HTML → JSX (parse5 AST), CSS → scoped styles, WAAPI → Framer Motion variants, props detection.
+
+const parse5 = require("parse5");
 
 /**
  * @param {object} extraction — output from surgical-extract.js
@@ -101,52 +103,143 @@ ${motionVariants}`;
   return { tsx, css, props, defaultProps: defaultPropsObj };
 }
 
-// ── HTML → JSX ───────────────────────────────────────────────────────
+// ── HTML → JSX (parse5 AST-based) ──────────────────────────────────────
+//
+// Rationale: chained regex replacements on raw HTML are fragile — they break
+// on attribute order, embedded quotes, malformed input. We parse to an AST
+// once, walk it, emit JSX. Single source of truth for attribute mapping.
 
-function htmlToJsx(html) {
-  let jsx = html;
+const VOID_ELEMENTS = new Set([
+  "area", "base", "br", "col", "embed", "hr", "img", "input",
+  "link", "meta", "source", "track", "wbr",
+]);
 
-  // Self-closing void elements
-  const voids = ["img", "br", "hr", "input", "meta", "link", "area", "base", "col", "embed", "source", "track", "wbr"];
-  for (const tag of voids) {
-    jsx = jsx.replace(new RegExp(`<${tag}([^>]*?)(?<!/)>`, "gi"), `<${tag}$1 />`);
+const BOOLEAN_ATTRS = new Set([
+  "disabled", "checked", "selected", "readonly", "required", "hidden",
+  "autoplay", "muted", "loop", "controls", "open", "default", "reversed",
+  "ismap", "novalidate", "formnovalidate", "playsinline", "autofocus",
+]);
+
+// HTML attr name → JSX attr name. Anything not listed passes through unchanged.
+const ATTR_RENAME = {
+  class: "className",
+  for: "htmlFor",
+  tabindex: "tabIndex",
+  colspan: "colSpan",
+  rowspan: "rowSpan",
+  autocomplete: "autoComplete",
+  autofocus: "autoFocus",
+  contenteditable: "contentEditable",
+  spellcheck: "spellCheck",
+  crossorigin: "crossOrigin",
+  enctype: "encType",
+  formaction: "formAction",
+  formenctype: "formEncType",
+  formmethod: "formMethod",
+  formnovalidate: "formNoValidate",
+  formtarget: "formTarget",
+  maxlength: "maxLength",
+  minlength: "minLength",
+  novalidate: "noValidate",
+  readonly: "readOnly",
+  srcset: "srcSet",
+  srcdoc: "srcDoc",
+  srclang: "srcLang",
+  usemap: "useMap",
+  accesskey: "accessKey",
+  allowfullscreen: "allowFullScreen",
+  charset: "charSet",
+  hreflang: "hrefLang",
+  inputmode: "inputMode",
+  itemprop: "itemProp",
+  itemscope: "itemScope",
+  itemtype: "itemType",
+  itemref: "itemRef",
+  itemid: "itemID",
+  marginheight: "marginHeight",
+  marginwidth: "marginWidth",
+  cellpadding: "cellPadding",
+  cellspacing: "cellSpacing",
+  frameborder: "frameBorder",
+  scrolling: "scrolling",
+  bgcolor: "bgColor",
+  acceptcharset: "acceptCharset",
+  longdesc: "longDesc",
+  mediagroup: "mediaGroup",
+};
+
+// Escape a string so it's safe inside a JSX text node.
+function jsxEscapeText(s) {
+  return s.replace(/[{}<>]/g, (c) => `{"${c}"}`);
+}
+
+// Escape a string so it's safe inside a JSX attribute value (double-quoted).
+function jsxEscapeAttr(s) {
+  return s.replace(/"/g, "&quot;");
+}
+
+function isInternalMarker(attrName) {
+  return /^data-mx-/.test(attrName);
+}
+
+function renderAttribute(attr) {
+  const name = attr.name.toLowerCase();
+  if (isInternalMarker(name)) return null;
+
+  const jsxName = ATTR_RENAME[name] || (name.startsWith("data-") || name.startsWith("aria-") ? name : name);
+
+  // Style string → object literal
+  if (name === "style") {
+    const obj = styleStringToObject(attr.value);
+    return `${jsxName}={${JSON.stringify(obj)}}`;
   }
 
-  // class → className
-  jsx = jsx.replace(/\bclass="/g, 'className="');
-  jsx = jsx.replace(/\bclass='/g, "className='");
+  // Boolean attribute (HTML allows valueless or empty-string)
+  if (BOOLEAN_ATTRS.has(name) && (attr.value === "" || attr.value === name)) {
+    return `${jsxName}={true}`;
+  }
 
-  // for → htmlFor
-  jsx = jsx.replace(/\bfor="/g, 'htmlFor="');
+  return `${jsxName}="${jsxEscapeAttr(attr.value)}"`;
+}
 
-  // tabindex → tabIndex
-  jsx = jsx.replace(/\btabindex="/g, 'tabIndex="');
+function renderNode(node, depth = 0) {
+  // Text node
+  if (node.nodeName === "#text") {
+    return jsxEscapeText(node.value);
+  }
+  // Comment node → JSX comment
+  if (node.nodeName === "#comment") {
+    return `{/* ${node.data.replace(/\*\//g, "* /")} */}`;
+  }
+  // Document fragment / root — render children only
+  if (node.nodeName === "#document-fragment" || node.nodeName === "#document") {
+    return (node.childNodes || []).map((c) => renderNode(c, depth)).join("");
+  }
 
-  // colspan → colSpan, rowspan → rowSpan
-  jsx = jsx.replace(/\bcolspan="/g, 'colSpan="');
-  jsx = jsx.replace(/\browspan="/g, 'rowSpan="');
+  const tag = node.tagName;
+  if (!tag) return "";
 
-  // autocomplete → autoComplete, autofocus → autoFocus
-  jsx = jsx.replace(/\bautocomplete="/g, 'autoComplete="');
-  jsx = jsx.replace(/\bautofocus\b/g, 'autoFocus');
+  // Render attributes
+  const attrs = (node.attrs || [])
+    .map(renderAttribute)
+    .filter((s) => s !== null)
+    .join(" ");
+  const attrsStr = attrs ? " " + attrs : "";
 
-  // style="..." → style={{ ... }}
-  jsx = jsx.replace(/\bstyle="([^"]*)"/g, (_, styleStr) => {
-    const obj = styleStringToObject(styleStr);
-    return `style={${JSON.stringify(obj)}}`;
-  });
+  // Self-closing for void elements
+  if (VOID_ELEMENTS.has(tag.toLowerCase())) {
+    return `<${tag}${attrsStr} />`;
+  }
 
-  // Remove internal capture markers
-  jsx = jsx.replace(/\s*data-mx-[\w-]+(?:="[^"]*")?/g, "");
-  jsx = jsx.replace(/\s*data-mx-[\w-]+(?:='[^']*')?/g, "");
+  const children = (node.childNodes || []).map((c) => renderNode(c, depth + 1)).join("");
+  return `<${tag}${attrsStr}>${children}</${tag}>`;
+}
 
-  // Boolean attributes
-  jsx = jsx.replace(/\b(disabled|checked|selected|readonly|required|hidden|autoplay|muted|loop|controls)(?=[\s/>])/g, '$1={true}');
-
-  // Comments
-  jsx = jsx.replace(/<!--([\s\S]*?)-->/g, '{/* $1 */}');
-
-  return jsx;
+function htmlToJsx(html) {
+  if (!html || !html.trim()) return "";
+  // parseFragment because we get section-level HTML, not full documents.
+  const fragment = parse5.parseFragment(html);
+  return renderNode(fragment);
 }
 
 function styleStringToObject(styleStr) {
