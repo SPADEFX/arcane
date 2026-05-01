@@ -3,6 +3,7 @@ import path from "path";
 
 const config: StorybookConfig = {
   stories: ["../ui-library/stories/**/*.stories.tsx"],
+  staticDirs: ["../public"],
   addons: ["@storybook/addon-essentials"],
   framework: {
     name: "@storybook/react-vite",

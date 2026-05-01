@@ -93,6 +93,11 @@
     --container-xl: 1280px;
     --container-2xl: 1536px;
 
+    /* Site-wide max content width — every section that ships with a
+       `maxWidth` prop falls back to this if no prop is given. Override
+       once at :root (or per-page) and the entire library re-flows. */
+    --site-max-width: var(--container-xl);
+
     /* ─── Radius ─────────────────────────────────── */
     --radius-none: 0;
     --radius-sm: 0.25rem;

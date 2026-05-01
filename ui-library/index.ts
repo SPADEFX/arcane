@@ -64,3 +64,12 @@ export { AaveProFooter } from "./sections/aave-pro-footer";
 export { AaveProMarkets } from "./sections/aave-pro-markets";
 export { AaveProSwap } from "./sections/aave-pro-swap";
 export { WordReveal as AaveProWordReveal } from "./sections/aave-pro-word-reveal";
+
+// Refero-distilled heroes
+export { HeroBramble } from "./sections/hero-bramble";
+export { HeroSeen } from "./sections/hero-seen";
+export { HeroAntimetal } from "./sections/hero-antimetal";
+export { HeroLinear } from "./sections/hero-linear";
+export { HeroFamily } from "./sections/hero-family";
+export { Bento601 } from "./sections/bento-601";
+export { LandingSynthesis } from "./sections/landing-synthesis";

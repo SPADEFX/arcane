@@ -69,6 +69,15 @@ const COMPONENT_META: Record<string, { name: string; category: ComponentCategory
   "aave-pro-markets": { name: "Markets Section", category: "section", desc: "Market data display section.", tags: ["markets", "data", "defi"], isSection: true },
   "aave-pro-swap": { name: "Swap Section", category: "section", desc: "Token swap interface section.", tags: ["swap", "trading", "defi"], isSection: true },
   "aave-pro-word-reveal": { name: "Word Reveal", category: "text-animation", desc: "Scroll-driven word reveal.", tags: ["text", "reveal", "scroll"], isSection: true },
+
+  // Refero-distilled heroes (built from styles.refero.design DESIGN.md sources)
+  "hero-bramble": { name: "Hero Bramble", category: "hero", desc: "Light cream hero with hand-drawn illustrated characters. Generated imagery from Gemini Nano Banana.", tags: ["hero", "cream", "illustrated", "warm", "playful"], isSection: true },
+  "hero-seen": { name: "Hero SEEN", category: "hero", desc: "Dreamy lavender gradient hero with sparkle accents. Built from SEEN's DESIGN.md.", tags: ["hero", "dreamy", "gradient", "playful"], isSection: true },
+  "hero-antimetal": { name: "Hero Antimetal", category: "hero", desc: "Dark navy hero with chartreuse CTA and dot-matrix globe. Serif display × sans UI.", tags: ["hero", "dark", "infrastructure", "saas"], isSection: true },
+  "hero-linear": { name: "Hero Linear", category: "hero", desc: "Pitch-black command-center hero with neon lime accent and dashboard preview.", tags: ["hero", "dark", "linear", "saas", "compact"], isSection: true },
+  "hero-family": { name: "Hero Family", category: "hero", desc: "Cream Pixar-storyboard hero with wobbly blob characters in primary colors.", tags: ["hero", "cream", "playful", "fintech"], isSection: true },
+  "bento-601": { name: "Bento 601", category: "hero", desc: "Architectural bento built from 601 Inc.'s DESIGN.md — gold on midnight matte.", tags: ["bento", "dark", "editorial", "cinematic"], isSection: true },
+  "landing-synthesis": { name: "Landing Synthesis", category: "hero", desc: "Full-page synthesis of 5 DESIGN.md references (601 + SEEN + Antimetal + Linear + Family).", tags: ["landing", "synthesis", "demo"], isSection: true },
 };
 
 export async function bootstrapRegistry(): Promise<number> {
