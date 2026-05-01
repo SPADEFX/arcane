@@ -40,9 +40,9 @@ export function Sidebar() {
           <span className="nav-icon">{icons.extract}</span>
           <span className="nav-label">Extract Tool</span>
         </NavLink>
-        <NavLink to="/generate" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
+        <NavLink to="/content" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
           <span className="nav-icon">✨</span>
-          <span className="nav-label">Image Gen</span>
+          <span className="nav-label">Content Studio</span>
         </NavLink>
         <NavLink to="/shader-lab" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
           <span className="nav-icon">{icons.shader}</span>

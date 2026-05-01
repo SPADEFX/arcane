@@ -17,29 +17,41 @@ const MODELS = {
     name: "Nano Banana Pro",
     description: "Illustrations · characters · text-in-image · hand-drawn",
     pricePerImage: 0.134,
+    provider: "google",
     family: "gemini",
+    type: "image",
     aspectRatios: ["1:1", "16:9", "4:5", "9:16", "21:9"],
+    supportsImageInput: true,
   },
   "gemini-2.5-flash-image": {
     name: "Nano Banana",
     description: "Cheap drafts · ~3× cheaper than Pro",
     pricePerImage: 0.039,
+    provider: "google",
     family: "gemini",
+    type: "image",
     aspectRatios: ["1:1", "16:9", "4:5", "9:16", "21:9"],
+    supportsImageInput: true,
   },
   "imagen-4.0-ultra-generate-001": {
     name: "Imagen 4 Ultra",
     description: "Photorealism · cinematic photography · products",
     pricePerImage: 0.06,
+    provider: "google",
     family: "imagen",
+    type: "image",
     aspectRatios: ["1:1", "16:9", "4:3", "3:4", "9:16"],
+    supportsImageInput: false,
   },
   "imagen-4.0-generate-001": {
     name: "Imagen 4",
     description: "Standard photoreal · cheaper than Ultra",
     pricePerImage: 0.04,
+    provider: "google",
     family: "imagen",
+    type: "image",
     aspectRatios: ["1:1", "16:9", "4:3", "3:4", "9:16"],
+    supportsImageInput: false,
   },
 };
 
@@ -70,9 +82,11 @@ function getGeminiKey() {
  * @param {string} opts.prompt
  * @param {string} [opts.aspectRatio="16:9"]
  * @param {string} [opts.model] — see MODELS catalogue above
+ * @param {string} [opts.referenceImageBase64] — base64 PNG (no data: prefix);
+ *   when provided + model.supportsImageInput, the prompt edits/varies it
  * @returns {Promise<{ok:true, base64:string, model:string} | {ok:false, error:string}>}
  */
-async function generateImage({ prompt, aspectRatio = "16:9", model = DEFAULT_MODEL }) {
+async function generateImage({ prompt, aspectRatio = "16:9", model = DEFAULT_MODEL, referenceImageBase64 }) {
   const key = getGeminiKey();
   if (!key) return { ok: false, error: "GEMINI_API_KEY not set (env or .env.image)" };
   if (!prompt || typeof prompt !== "string") return { ok: false, error: "missing prompt" };
@@ -104,9 +118,18 @@ async function generateImage({ prompt, aspectRatio = "16:9", model = DEFAULT_MOD
     }
   }
 
-  // Gemini-image — :generateContent endpoint
+  // Gemini-image — :generateContent endpoint.
+  // Image-to-image: prepend the reference image as inlineData in `parts`.
+  const parts = [];
+  if (referenceImageBase64 && meta.supportsImageInput) {
+    parts.push({
+      inlineData: { mimeType: "image/png", data: referenceImageBase64 },
+    });
+  }
+  parts.push({ text: prompt });
+
   const body = JSON.stringify({
-    contents: [{ parts: [{ text: prompt }] }],
+    contents: [{ parts }],
     generationConfig: {
       responseModalities: ["IMAGE"],
       imageConfig: { aspectRatio },

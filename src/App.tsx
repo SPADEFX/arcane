@@ -28,6 +28,9 @@ const ComponentPreview = lazy(() =>
 const GeneratePage = lazy(() =>
   import("./pages/GeneratePage").then((m) => ({ default: m.GeneratePage }))
 );
+const ContentPage = lazy(() =>
+  import("./pages/ContentPage").then((m) => ({ default: m.ContentPage }))
+);
 
 function Loading() {
   return (
@@ -84,6 +87,7 @@ export default function App() {
                     <Route path="/shader-lab" element={<ShaderLabWrapper />} />
                     <Route path="/library" element={<LibraryPage />} />
                     <Route path="/generate" element={<GeneratePage />} />
+                    <Route path="/content" element={<ContentPage />} />
                     <Route path="/storybook" element={<StorybookPage />} />
                     <Route path="/builder" element={<BuilderDashboard />} />
                     <Route path="/site/:siteId" element={<BuilderEditor />} />

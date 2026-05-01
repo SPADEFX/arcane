@@ -1048,29 +1048,31 @@ async function handleDeleteExtracted(req, res) {
 }
 
 /* ─── Image generation (Gemini Nano Banana) ─────────────────────────── */
+function makeSlug(slug) {
+  return (slug || `gen-${Date.now()}`)
+    .toString().toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "")
+    .slice(0, 64) || `gen-${Date.now()}`;
+}
+
 async function handleGenerateImage(req, res) {
   let body = "";
-  req.on("data", (c) => { body += c; if (body.length > 1e5) req.destroy(); });
+  req.on("data", (c) => { body += c; if (body.length > 5e6) req.destroy(); });
   req.on("end", async () => {
     try {
-      const { prompt, aspectRatio, slug, model } = JSON.parse(body);
+      const { prompt, aspectRatio, slug, model, referenceImageBase64 } = JSON.parse(body);
       if (!prompt) return sendJson(res, 400, { error: "missing prompt" });
 
-      const { generateImage } = require("./lib/image-gen");
+      const { generateImage, MODELS } = require("./lib/image-gen");
       const result = await generateImage({
         prompt,
         aspectRatio: aspectRatio || "16:9",
         model,
+        referenceImageBase64,
       });
       if (!result.ok) return sendJson(res, 500, { error: result.error });
 
-      // Slug — use given or generate one
-      const safeSlug = (slug || `gen-${Date.now()}`)
-        .toString().toLowerCase()
-        .replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "")
-        .slice(0, 64) || `gen-${Date.now()}`;
-
-      // Save to studio's public/generated/ so any component can <img src="/generated/{slug}.png" />
+      const safeSlug = makeSlug(slug);
       const studioRoot = path.join(__dirname, "..");
       const outDir = path.join(studioRoot, "public", "generated");
       await fs.promises.mkdir(outDir, { recursive: true });
@@ -1079,6 +1081,20 @@ async function handleGenerateImage(req, res) {
       await fs.promises.writeFile(tmp, Buffer.from(result.base64, "base64"));
       await fs.promises.rename(tmp, outPath);
 
+      // Log to ledger
+      const { append } = require("./lib/ledger");
+      const meta = MODELS[result.model] || {};
+      await append({
+        provider: meta.provider || "google",
+        model: result.model,
+        type: referenceImageBase64 ? "image-to-image" : "image",
+        slug: safeSlug,
+        prompt,
+        aspectRatio: aspectRatio || "16:9",
+        estimatedCost: meta.pricePerImage || 0,
+        url: `/generated/${safeSlug}.png`,
+      });
+
       sendJson(res, 200, {
         ok: true,
         slug: safeSlug,
@@ -1086,8 +1102,142 @@ async function handleGenerateImage(req, res) {
         prompt,
         aspectRatio: aspectRatio || "16:9",
         model: result.model,
+        provider: meta.provider || "google",
+        estimatedCost: meta.pricePerImage || 0,
         createdAt: new Date().toISOString(),
       });
+    } catch (e) {
+      sendJson(res, 500, { error: String(e.message || e) });
+    }
+  });
+}
+
+/**
+ * Unified content generation endpoint.
+ * Body: { type, model, prompt, aspectRatio, slug?, sourceImageSlug? }
+ *   type = "image" | "video" | "image-to-video" | "image-to-image"
+ *   model dispatches by provider:
+ *     - if model is in image-gen MODELS  → google
+ *     - if model is in fal-gen MODELS    → fal
+ */
+async function handleGenerateUnified(req, res) {
+  let body = "";
+  req.on("data", (c) => { body += c; if (body.length > 5e6) req.destroy(); });
+  req.on("end", async () => {
+    try {
+      const { type, model, prompt, aspectRatio, slug, sourceImageSlug, referenceImageBase64 } = JSON.parse(body);
+      if (!prompt) return sendJson(res, 400, { error: "missing prompt" });
+      if (!model) return sendJson(res, 400, { error: "missing model" });
+
+      const { MODELS: googleModels, generateImage } = require("./lib/image-gen");
+      const falGen = require("./lib/fal-gen");
+      const { append } = require("./lib/ledger");
+
+      const studioRoot = path.join(__dirname, "..");
+      const outDir = path.join(studioRoot, "public", "generated");
+      await fs.promises.mkdir(outDir, { recursive: true });
+
+      const safeSlug = makeSlug(slug);
+
+      /* ── Google branch (image / image-to-image) ────────────────── */
+      if (googleModels[model]) {
+        const meta = googleModels[model];
+        // For image-to-image, fetch the source image from disk and base64-encode
+        let refB64 = referenceImageBase64 || null;
+        if (!refB64 && sourceImageSlug && meta.supportsImageInput) {
+          const srcPath = path.join(outDir, `${sourceImageSlug}.png`);
+          if (fs.existsSync(srcPath)) {
+            refB64 = (await fs.promises.readFile(srcPath)).toString("base64");
+          }
+        }
+
+        const result = await generateImage({
+          prompt,
+          aspectRatio: aspectRatio || "16:9",
+          model,
+          referenceImageBase64: refB64,
+        });
+        if (!result.ok) return sendJson(res, 500, { error: result.error });
+
+        const outPath = path.join(outDir, `${safeSlug}.png`);
+        const tmp = outPath + ".tmp";
+        await fs.promises.writeFile(tmp, Buffer.from(result.base64, "base64"));
+        await fs.promises.rename(tmp, outPath);
+
+        await append({
+          provider: "google",
+          model: result.model,
+          type: refB64 ? "image-to-image" : "image",
+          slug: safeSlug,
+          prompt,
+          aspectRatio: aspectRatio || "16:9",
+          estimatedCost: meta.pricePerImage || 0,
+          url: `/generated/${safeSlug}.png`,
+        });
+
+        return sendJson(res, 200, {
+          ok: true,
+          slug: safeSlug,
+          url: `/generated/${safeSlug}.png`,
+          provider: "google",
+          model: result.model,
+          type: refB64 ? "image-to-image" : "image",
+          estimatedCost: meta.pricePerImage || 0,
+          createdAt: new Date().toISOString(),
+        });
+      }
+
+      /* ── fal.ai branch (video / image-to-video) ───────────────── */
+      if (falGen.MODELS[model]) {
+        const meta = falGen.MODELS[model];
+
+        let imageUrl = null;
+        if (meta.type === "image-to-video") {
+          if (!sourceImageSlug) return sendJson(res, 400, { error: "image-to-video needs sourceImageSlug" });
+          const srcPath = path.join(outDir, `${sourceImageSlug}.png`);
+          if (!fs.existsSync(srcPath)) return sendJson(res, 400, { error: "source image not found" });
+          imageUrl = await falGen.uploadLocalImage(srcPath);
+        }
+
+        const result = await falGen.generate({
+          prompt,
+          model,
+          imageUrl,
+          aspectRatio,
+        });
+        if (!result.ok) return sendJson(res, 500, { error: result.error });
+
+        // Download the produced asset to public/generated/{slug}.{ext}
+        const ext = meta.type.includes("video") ? "mp4" : "png";
+        const outPath = path.join(outDir, `${safeSlug}.${ext}`);
+        await falGen.downloadTo(result.url, outPath);
+
+        await append({
+          provider: "fal",
+          model,
+          type: meta.type,
+          slug: safeSlug,
+          prompt,
+          aspectRatio: aspectRatio || "16:9",
+          estimatedCost: meta.pricePerVideo || meta.pricePerImage || 0,
+          url: `/generated/${safeSlug}.${ext}`,
+          durationSec: meta.durationSec,
+        });
+
+        return sendJson(res, 200, {
+          ok: true,
+          slug: safeSlug,
+          url: `/generated/${safeSlug}.${ext}`,
+          provider: "fal",
+          model,
+          type: meta.type,
+          estimatedCost: meta.pricePerVideo || meta.pricePerImage || 0,
+          durationSec: meta.durationSec,
+          createdAt: new Date().toISOString(),
+        });
+      }
+
+      return sendJson(res, 400, { error: `unknown model: ${model}` });
     } catch (e) {
       sendJson(res, 500, { error: String(e.message || e) });
     }
@@ -1179,11 +1329,25 @@ const server = http.createServer((req, res) => {
   if (req.method === "POST" && req.url === "/api/save-to-library") return handleSaveToLibrary(req, res);
   if (req.method === "DELETE" && req.url.startsWith("/api/extracted/")) return handleDeleteExtracted(req, res);
   if (req.method === "POST" && req.url === "/api/generate-image") return handleGenerateImage(req, res);
+  if (req.method === "POST" && req.url === "/api/generate") return handleGenerateUnified(req, res);
   if (req.method === "GET" && req.url === "/api/generated-images") return handleListGenerated(req, res);
   if (req.method === "DELETE" && req.url.startsWith("/api/generated-images/")) return handleDeleteGenerated(req, res);
   if (req.method === "GET" && req.url === "/api/image-models") {
-    const { MODELS, DEFAULT_MODEL } = require("./lib/image-gen");
-    return sendJson(res, 200, { ok: true, models: MODELS, default: DEFAULT_MODEL });
+    const { MODELS: imgModels, DEFAULT_MODEL } = require("./lib/image-gen");
+    return sendJson(res, 200, { ok: true, models: imgModels, default: DEFAULT_MODEL });
+  }
+  if (req.method === "GET" && req.url === "/api/models") {
+    const { MODELS: imgModels, DEFAULT_MODEL } = require("./lib/image-gen");
+    const { MODELS: falModels } = require("./lib/fal-gen");
+    return sendJson(res, 200, {
+      ok: true,
+      models: { ...imgModels, ...falModels },
+      default: DEFAULT_MODEL,
+    });
+  }
+  if (req.method === "GET" && req.url === "/api/usage") {
+    const { getUsage } = require("./lib/ledger");
+    return sendJson(res, 200, { ok: true, usage: getUsage() });
   }
   if (req.method === "POST" && req.url === "/api/export-site") return handleExportSite(req, res);
   if (req.method === "GET" && req.url === "/api/progress") return handleProgress(req, res);
