@@ -287,7 +287,7 @@ export function ContentPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {filteredModels.map(([id, m]) => {
                       const active = id === model;
-                      const brand = BRAND[m.provider];
+                      const brand = BRAND[m.provider] || BRAND.google;
                       const price = m.pricePerVideo ?? m.pricePerImage ?? 0;
                       return (
                         <button
@@ -371,7 +371,7 @@ export function ContentPage() {
                   className="px-5 py-2.5 rounded-lg text-white text-[13px] font-medium transition-colors inline-flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
                   style={{
                     background: activeModel
-                      ? BRAND[activeModel.provider].accent
+                      ? (BRAND[activeModel.provider] || BRAND.google).accent
                       : "#3b82f6",
                   }}
                 >
