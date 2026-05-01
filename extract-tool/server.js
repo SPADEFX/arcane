@@ -165,7 +165,7 @@ async function handleExtract(req, res) {
       const html = cloneUrl ? data.rawHtml : (data.rawHtml || buildHtml(data));
       // Cache CSS+reverseData per source URL with TTL — avoids cross-request bleed.
       const cssRulesStr = (data.cssRules || []).map((r) => r.selector + "{" + r.cssText + "}").join("\n");
-      cachePut(parsed.url, { cssRules: cssRulesStr, reverseData: data.reverseData || null });
+      cachePut(url, { cssRules: cssRulesStr, reverseData: data.reverseData || null });
       setProgress("Terminé", 100, "Envoi des résultats...");
       clearProgress();
       sendJson(res, 200, {
@@ -1047,6 +1047,92 @@ async function handleDeleteExtracted(req, res) {
   sendJson(res, 200, { ok: true, removed, errors });
 }
 
+/* ─── Image generation (Gemini Nano Banana) ─────────────────────────── */
+async function handleGenerateImage(req, res) {
+  let body = "";
+  req.on("data", (c) => { body += c; if (body.length > 1e5) req.destroy(); });
+  req.on("end", async () => {
+    try {
+      const { prompt, aspectRatio, slug, model } = JSON.parse(body);
+      if (!prompt) return sendJson(res, 400, { error: "missing prompt" });
+
+      const { generateImage } = require("./lib/image-gen");
+      const result = await generateImage({
+        prompt,
+        aspectRatio: aspectRatio || "16:9",
+        model,
+      });
+      if (!result.ok) return sendJson(res, 500, { error: result.error });
+
+      // Slug — use given or generate one
+      const safeSlug = (slug || `gen-${Date.now()}`)
+        .toString().toLowerCase()
+        .replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "")
+        .slice(0, 64) || `gen-${Date.now()}`;
+
+      // Save to studio's public/generated/ so any component can <img src="/generated/{slug}.png" />
+      const studioRoot = path.join(__dirname, "..");
+      const outDir = path.join(studioRoot, "public", "generated");
+      await fs.promises.mkdir(outDir, { recursive: true });
+      const outPath = path.join(outDir, `${safeSlug}.png`);
+      const tmp = outPath + ".tmp";
+      await fs.promises.writeFile(tmp, Buffer.from(result.base64, "base64"));
+      await fs.promises.rename(tmp, outPath);
+
+      sendJson(res, 200, {
+        ok: true,
+        slug: safeSlug,
+        url: `/generated/${safeSlug}.png`,
+        prompt,
+        aspectRatio: aspectRatio || "16:9",
+        model: result.model,
+        createdAt: new Date().toISOString(),
+      });
+    } catch (e) {
+      sendJson(res, 500, { error: String(e.message || e) });
+    }
+  });
+}
+
+async function handleListGenerated(req, res) {
+  try {
+    const studioRoot = path.join(__dirname, "..");
+    const dir = path.join(studioRoot, "public", "generated");
+    if (!fs.existsSync(dir)) return sendJson(res, 200, { ok: true, images: [] });
+    const files = await fs.promises.readdir(dir);
+    const images = [];
+    for (const f of files) {
+      if (!f.endsWith(".png")) continue;
+      const full = path.join(dir, f);
+      const stat = await fs.promises.stat(full);
+      images.push({
+        slug: f.replace(/\.png$/, ""),
+        url: `/generated/${f}`,
+        size: stat.size,
+        createdAt: stat.mtime.toISOString(),
+      });
+    }
+    images.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    sendJson(res, 200, { ok: true, images });
+  } catch (e) {
+    sendJson(res, 500, { error: String(e.message || e) });
+  }
+}
+
+async function handleDeleteGenerated(req, res) {
+  const slug = decodeURIComponent(req.url.replace(/^\/api\/generated-images\//, ""));
+  if (!slug || /[/\\]/.test(slug)) return sendJson(res, 400, { error: "invalid slug" });
+  const studioRoot = path.join(__dirname, "..");
+  const file = path.join(studioRoot, "public", "generated", `${slug}.png`);
+  try {
+    await fs.promises.unlink(file);
+    sendJson(res, 200, { ok: true, slug });
+  } catch (e) {
+    if (e.code === "ENOENT") return sendJson(res, 404, { error: "not found" });
+    sendJson(res, 500, { error: String(e.message || e) });
+  }
+}
+
 async function handleExportSite(req, res) {
   let body = "";
   req.on("data", (c) => { body += c; });
@@ -1092,6 +1178,13 @@ const server = http.createServer((req, res) => {
   if (req.method === "POST" && req.url === "/api/extract-to-component") return handleExtractToComponent(req, res);
   if (req.method === "POST" && req.url === "/api/save-to-library") return handleSaveToLibrary(req, res);
   if (req.method === "DELETE" && req.url.startsWith("/api/extracted/")) return handleDeleteExtracted(req, res);
+  if (req.method === "POST" && req.url === "/api/generate-image") return handleGenerateImage(req, res);
+  if (req.method === "GET" && req.url === "/api/generated-images") return handleListGenerated(req, res);
+  if (req.method === "DELETE" && req.url.startsWith("/api/generated-images/")) return handleDeleteGenerated(req, res);
+  if (req.method === "GET" && req.url === "/api/image-models") {
+    const { MODELS, DEFAULT_MODEL } = require("./lib/image-gen");
+    return sendJson(res, 200, { ok: true, models: MODELS, default: DEFAULT_MODEL });
+  }
   if (req.method === "POST" && req.url === "/api/export-site") return handleExportSite(req, res);
   if (req.method === "GET" && req.url === "/api/progress") return handleProgress(req, res);
   if (req.method === "GET" && req.url.startsWith("/api/clone-files")) return handleCloneFiles(req, res);
