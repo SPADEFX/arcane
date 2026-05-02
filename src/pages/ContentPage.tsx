@@ -53,6 +53,47 @@ interface GeneratedAsset {
   createdAt: string;
 }
 
+/* CSS for the compression animation — mosaic + scan + pixelate */
+const COMPRESS_ANIM_CSS = `
+@keyframes compress-pixelate {
+  0%, 100% { filter: contrast(1) saturate(1); transform: scale(1); }
+  35%      { filter: contrast(1.4) saturate(1.2) blur(2px); transform: scale(0.985); }
+  65%      { filter: contrast(0.9) saturate(0.85) blur(1.5px); transform: scale(1.005); }
+}
+.compressing-img {
+  animation: compress-pixelate 1.6s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+}
+@keyframes compress-scan {
+  0%   { top: -10%; opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { top: 110%; opacity: 0; }
+}
+.compressing-scan::before {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; height: 64px;
+  background: linear-gradient(180deg, transparent 0%, rgba(66,133,244,0.1) 30%, rgba(66,133,244,0.55) 50%, rgba(66,133,244,0.1) 70%, transparent 100%);
+  filter: blur(0.5px);
+  animation: compress-scan 1.8s ease-in-out infinite;
+}
+@keyframes compress-mosaic {
+  0%, 100% { opacity: 0.25; transform: scale(1); }
+  50%      { opacity: 0.55; transform: scale(1.02); }
+}
+.compressing-mosaic {
+  background-image:
+    linear-gradient(rgba(66,133,244,0.18) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(66,133,244,0.18) 1px, transparent 1px);
+  background-size: 24px 24px;
+  mix-blend-mode: screen;
+  animation: compress-mosaic 1.4s ease-in-out infinite;
+}
+`;
+
 type Tab = "image" | "video" | "image-to-video" | "image-to-image" | "compress";
 
 const TABS: { id: Tab; label: string; modelTypes: string[] }[] = [
@@ -211,6 +252,7 @@ export function ContentPage() {
 
   return (
     <div className="flex h-full flex-col bg-zinc-950 text-zinc-100">
+      <style dangerouslySetInnerHTML={{ __html: COMPRESS_ANIM_CSS }} />
       {/* ── STICKY HEADER ─────────────────────────────────────────── */}
       <ProviderHeader usage={usage} models={models} />
 
@@ -712,6 +754,20 @@ function CompressPanel({
   } | null>(null);
 
   const sources = images.filter((i) => !i.url.endsWith(".mp4"));
+  const sourceImage = sources.find((i) => i.slug === sourceSlug);
+
+  // Fetch original byte size when source changes (so the right panel shows
+  // it before the user actually compresses)
+  const [sourceBytes, setSourceBytes] = useState<number | null>(null);
+  useEffect(() => {
+    if (!sourceImage) { setSourceBytes(null); return; }
+    fetch(sourceImage.url, { method: "HEAD" })
+      .then((r) => {
+        const len = r.headers.get("content-length");
+        if (len) setSourceBytes(parseInt(len, 10));
+      })
+      .catch(() => {});
+  }, [sourceImage]);
 
   function fmtBytes(n: number) {
     if (n < 1024) return `${n} B`;
@@ -723,6 +779,7 @@ function CompressPanel({
     if (!sourceSlug || busy) return;
     setBusy(true);
     setError(null);
+    setResult(null);
     try {
       const res = await fetch(`${API}/api/compress`, {
         method: "POST",
@@ -758,7 +815,7 @@ function CompressPanel({
                 <button
                   key={img.slug}
                   type="button"
-                  onClick={() => setSourceSlug(img.slug)}
+                  onClick={() => { setSourceSlug(img.slug); setResult(null); }}
                   className={`rounded-md border-2 overflow-hidden transition-colors aspect-square ${
                     sourceSlug === img.slug
                       ? "border-zinc-400"
@@ -781,7 +838,7 @@ function CompressPanel({
               <button
                 key={f.value}
                 type="button"
-                onClick={() => setFormat(f.value)}
+                onClick={() => { setFormat(f.value); setResult(null); }}
                 className={`w-full text-left rounded-lg border p-2.5 transition-colors ${
                   format === f.value
                     ? "bg-zinc-800/60 border-zinc-600"
@@ -810,7 +867,7 @@ function CompressPanel({
             min="10"
             max="100"
             value={quality}
-            onChange={(e) => setQuality(Number(e.target.value))}
+            onChange={(e) => { setQuality(Number(e.target.value)); setResult(null); }}
             className="w-full accent-blue-500"
           />
           <div className="flex justify-between text-[10px] text-zinc-600 mt-1">
@@ -834,65 +891,188 @@ function CompressPanel({
         )}
       </div>
 
-      {/* Before / After comparison */}
+      {/* Right pane — preview / animation / slider */}
       <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 overflow-hidden">
-        {!result ? (
+        {!sourceImage ? (
           <div className="flex items-center justify-center text-[12px] text-zinc-600 px-6 py-32 text-center">
-            Pick an image, choose a format, and hit Compress to see the before/after.
+            Pick an image to begin.
           </div>
+        ) : result ? (
+          <BeforeAfterSlider
+            before={{ url: result.sourceUrl, label: "Base", bytes: result.originalSize, fmtBytes }}
+            after={{ url: result.url, label: result.format.toUpperCase(), bytes: result.compressedSize, fmtBytes }}
+            savings={result.savings}
+          />
         ) : (
-          <div>
-            <div className="grid grid-cols-2 divide-x divide-zinc-800">
-              <CompareCell label="Original" url={result.sourceUrl} bytes={result.originalSize} fmtBytes={fmtBytes} />
-              <CompareCell
-                label={`${result.format.toUpperCase()} q${quality}`}
-                url={result.url}
-                bytes={result.compressedSize}
-                fmtBytes={fmtBytes}
-                accent
-              />
-            </div>
-            <div className="border-t border-zinc-800 p-3 flex items-center justify-between">
-              <span className="text-[12px] text-zinc-500">
-                Savings:{" "}
-                <span className="text-emerald-400 font-mono tabular-nums">
-                  {result.savings > 0 ? `${result.savings}%` : "—"}
-                </span>
-              </span>
-              <button
-                onClick={() => navigator.clipboard.writeText(result.url)}
-                className="text-[11px] px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300"
-              >
-                Copy URL
-              </button>
-            </div>
-          </div>
+          <CompressingPreview
+            url={sourceImage.url}
+            label="Base"
+            bytes={sourceBytes}
+            fmtBytes={fmtBytes}
+            busy={busy}
+          />
         )}
       </div>
     </div>
   );
 }
 
-function CompareCell({
-  label, url, bytes, fmtBytes, accent,
+/* ─── Compressing preview — image + sweep line + pixelate animation ───── */
+
+function CompressingPreview({
+  url, label, bytes, fmtBytes, busy,
 }: {
-  label: string;
   url: string;
-  bytes: number;
+  label: string;
+  bytes: number | null;
   fmtBytes: (n: number) => string;
-  accent?: boolean;
+  busy: boolean;
 }) {
   return (
     <div className="flex flex-col">
-      <div
-        className="px-3 py-2 flex items-center justify-between text-[11px] uppercase tracking-[0.18em]"
-        style={{ color: accent ? "#34d399" : "#71717a" }}
-      >
+      <div className="px-3 py-2 flex items-center justify-between text-[11px] uppercase tracking-[0.18em] text-zinc-500">
         <span>{label}</span>
-        <span className="font-mono tabular-nums">{fmtBytes(bytes)}</span>
+        <span className="font-mono tabular-nums">{bytes != null ? fmtBytes(bytes) : "—"}</span>
       </div>
-      <div className="bg-[#0a0a0a] flex items-center justify-center" style={{ minHeight: 320 }}>
-        <img src={url} alt="" className="max-w-full max-h-[420px] object-contain" />
+      <div className="relative bg-[#0a0a0a] flex items-center justify-center overflow-hidden" style={{ minHeight: 360 }}>
+        <img
+          src={url}
+          alt=""
+          className={`max-w-full max-h-[460px] object-contain ${busy ? "compressing-img" : ""}`}
+        />
+
+        {busy && (
+          <>
+            {/* Scan sweep */}
+            <div className="compressing-scan pointer-events-none absolute inset-0" />
+            {/* Mosaic block dots — visual texture cue */}
+            <div className="compressing-mosaic pointer-events-none absolute inset-0" />
+            {/* Status */}
+            <div className="absolute bottom-3 left-3 right-3 flex items-center justify-center gap-2 text-[11px] text-white/70">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse" />
+              Encoding…
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Before/After slider — drag to reveal ────────────────────────────── */
+
+function BeforeAfterSlider({
+  before, after, savings,
+}: {
+  before: { url: string; label: string; bytes: number; fmtBytes: (n: number) => string };
+  after: { url: string; label: string; bytes: number; fmtBytes: (n: number) => string };
+  savings: number;
+}) {
+  const [pos, setPos] = useState(50);
+  const [dragging, setDragging] = useState(false);
+
+  function onMove(e: MouseEvent | TouchEvent | React.MouseEvent | React.TouchEvent, container: HTMLDivElement) {
+    const rect = container.getBoundingClientRect();
+    const clientX =
+      "touches" in e
+        ? e.touches[0]?.clientX
+        : (e as MouseEvent).clientX;
+    if (clientX == null) return;
+    const x = clientX - rect.left;
+    const p = Math.max(0, Math.min(100, (x / rect.width) * 100));
+    setPos(p);
+  }
+
+  return (
+    <div className="flex flex-col">
+      {/* Headers */}
+      <div className="grid grid-cols-2 divide-x divide-zinc-800">
+        <div className="px-3 py-2 flex items-center justify-between text-[11px] uppercase tracking-[0.18em] text-zinc-500">
+          <span>{before.label}</span>
+          <span className="font-mono tabular-nums">{before.fmtBytes(before.bytes)}</span>
+        </div>
+        <div className="px-3 py-2 flex items-center justify-between text-[11px] uppercase tracking-[0.18em]" style={{ color: "#34d399" }}>
+          <span>{after.label}</span>
+          <span className="flex items-center gap-2">
+            <span className="font-mono tabular-nums">{after.fmtBytes(after.bytes)}</span>
+            {savings > 0 && (
+              <span
+                className="font-mono tabular-nums px-1.5 py-0.5 rounded text-[10px]"
+                style={{ background: "#34d39922", color: "#34d399" }}
+              >
+                −{savings}%
+              </span>
+            )}
+          </span>
+        </div>
+      </div>
+
+      {/* Slider canvas */}
+      <div
+        className="relative bg-[#0a0a0a] flex items-center justify-center overflow-hidden select-none"
+        style={{ minHeight: 360 }}
+        onMouseDown={(e) => {
+          setDragging(true);
+          onMove(e, e.currentTarget);
+        }}
+        onTouchStart={(e) => {
+          setDragging(true);
+          onMove(e, e.currentTarget);
+        }}
+        onMouseMove={(e) => {
+          if (dragging) onMove(e, e.currentTarget);
+        }}
+        onTouchMove={(e) => {
+          if (dragging) onMove(e, e.currentTarget);
+        }}
+        onMouseUp={() => setDragging(false)}
+        onMouseLeave={() => setDragging(false)}
+        onTouchEnd={() => setDragging(false)}
+      >
+        {/* After image — full */}
+        <img
+          src={after.url}
+          alt=""
+          className="max-w-full max-h-[460px] object-contain pointer-events-none"
+          style={{ position: "relative", zIndex: 1 }}
+        />
+        {/* Before image — clipped to the left of the handle */}
+        <div
+          className="absolute inset-0 flex items-center justify-center pointer-events-none"
+          style={{
+            zIndex: 2,
+            clipPath: `polygon(0 0, ${pos}% 0, ${pos}% 100%, 0 100%)`,
+            WebkitClipPath: `polygon(0 0, ${pos}% 0, ${pos}% 100%, 0 100%)`,
+          }}
+        >
+          <img src={before.url} alt="" className="max-w-full max-h-[460px] object-contain" />
+        </div>
+        {/* Handle */}
+        <div
+          className="absolute top-0 bottom-0 pointer-events-none"
+          style={{
+            left: `${pos}%`,
+            transform: "translateX(-50%)",
+            zIndex: 3,
+          }}
+        >
+          <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-px bg-white/70" />
+          <div
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-lg flex items-center justify-center"
+            style={{ width: 36, height: 36 }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0a0a0a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 6l-6 6 6 6M15 6l6 6-6 6" />
+            </svg>
+          </div>
+        </div>
+        {/* Top labels */}
+        <div className="absolute top-3 left-3 px-2 py-1 rounded text-[10px] uppercase tracking-[0.18em] bg-black/50 text-white/80 z-10 backdrop-blur">
+          {before.label}
+        </div>
+        <div className="absolute top-3 right-3 px-2 py-1 rounded text-[10px] uppercase tracking-[0.18em] bg-black/50 z-10 backdrop-blur" style={{ color: "#34d399" }}>
+          {after.label}
+        </div>
       </div>
     </div>
   );
