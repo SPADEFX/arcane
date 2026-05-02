@@ -71,9 +71,9 @@ const BRAND = {
   },
   fal: {
     label: "fal.ai",
-    accent: "#ff5b3b",
-    accentSoft: "#ff5b3b22",
-    gradient: "linear-gradient(135deg, #1a1a1a 0%, #ff5b3b 100%)",
+    accent: "#EC0648",
+    accentSoft: "#EC064822",
+    gradient: "linear-gradient(135deg, #ffffff 0%, #ffffff 100%)",
   },
 };
 
@@ -556,20 +556,14 @@ function ProviderHeader({ usage }: { usage: Usage | null }) {
           gradient={BRAND.fal.gradient}
           stats={fal}
           icon={
-            <div
-              className="flex items-center justify-center font-bold"
-              style={{
-                width: 22,
-                height: 22,
-                background: "#1a1a1a",
-                color: BRAND.fal.accent,
-                borderRadius: 6,
-                fontSize: 12,
-                fontFamily: "ui-monospace, monospace",
-              }}
-            >
-              ƒ
-            </div>
+            <svg viewBox="0 0 1855 1855" width="20" height="20">
+              <path
+                fillRule="evenodd"
+                clipRule="evenodd"
+                d="M1181.65 78C1212.05 78 1236.42 101.947 1239.32 131.261C1265.25 392.744 1480.07 600.836 1750.02 625.948C1780.28 628.764 1805 652.366 1805 681.816V1174.18C1805 1203.63 1780.28 1227.24 1750.02 1230.05C1480.07 1255.16 1265.25 1463.26 1239.32 1724.74C1236.42 1754.05 1212.05 1778 1181.65 1778H673.354C642.951 1778 618.585 1754.05 615.678 1724.74C589.754 1463.26 374.927 1255.16 104.984 1230.05C74.7212 1227.24 50 1203.63 50 1174.18V681.816C50 652.366 74.7213 628.764 104.984 625.948C374.927 600.836 589.754 392.744 615.678 131.261C618.585 101.946 642.951 78 673.353 78H1181.65ZM402.377 926.561C402.377 1209.41 638.826 1438.71 930.501 1438.71C1222.18 1438.71 1458.62 1209.41 1458.62 926.561C1458.62 643.709 1222.18 414.412 930.501 414.412C638.826 414.412 402.377 643.709 402.377 926.561Z"
+                fill="#EC0648"
+              />
+            </svg>
           }
         />
 
