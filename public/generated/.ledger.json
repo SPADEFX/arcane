@@ -38,5 +38,89 @@
     "tokensIn": 697,
     "tokensOut": 208,
     "estimatedCost": 0.000114675
+  },
+  {
+    "id": "gen_1777746268633_qejjh1",
+    "createdAt": "2026-05-02T18:24:28.633Z",
+    "provider": "google",
+    "model": "gemini-2.5-flash",
+    "type": "prompt-enhance",
+    "prompt": "Cinematic hyperreal photograph, lone human silhouette shot from behind centered in frame, standing absolutely still, sur",
+    "styleHint": null,
+    "tokensIn": 787,
+    "tokensOut": 250,
+    "estimatedCost": 0.00013402500000000002
+  },
+  {
+    "id": "gen_1777746279580_kb4i4g",
+    "createdAt": "2026-05-02T18:24:39.580Z",
+    "provider": "google",
+    "model": "gemini-2.5-flash",
+    "type": "prompt-enhance",
+    "prompt": "Cinematic hyperreal photograph, lone human silhouette shot from behind centered in frame, standing absolutely still, sur",
+    "styleHint": null,
+    "tokensIn": 787,
+    "tokensOut": 248,
+    "estimatedCost": 0.00013342499999999998
+  },
+  {
+    "id": "gen_1777746290783_tgxes8",
+    "createdAt": "2026-05-02T18:24:50.783Z",
+    "provider": "google",
+    "model": "gemini-2.5-flash",
+    "type": "prompt-enhance",
+    "prompt": "Cinematic hyperreal photograph, lone human silhouette shot from behind centered in frame, standing absolutely still, sur",
+    "styleHint": null,
+    "tokensIn": 787,
+    "tokensOut": 249,
+    "estimatedCost": 0.00013372499999999998
+  },
+  {
+    "id": "gen_1777746359986_frxxte",
+    "createdAt": "2026-05-02T18:25:59.986Z",
+    "provider": "google",
+    "model": "gemini-2.5-flash",
+    "type": "prompt-enhance",
+    "prompt": "Cinematic hyperreal photograph, lone human silhouette shot from behind centered in frame, standing absolutely still, sur",
+    "styleHint": null,
+    "tokensIn": 787,
+    "tokensOut": 245,
+    "estimatedCost": 0.000132525
+  },
+  {
+    "id": "gen_1777746427472_uxo1di",
+    "createdAt": "2026-05-02T18:27:07.472Z",
+    "provider": "google",
+    "model": "gemini-2.5-flash",
+    "type": "prompt-enhance",
+    "prompt": "Cinematic hyperreal photograph, lone human silhouette shot from behind centered in frame, standing absolutely still, sur",
+    "styleHint": null,
+    "tokensIn": 787,
+    "tokensOut": 264,
+    "estimatedCost": 0.00013822499999999999
+  },
+  {
+    "id": "gen_1777746526021_fztegh",
+    "createdAt": "2026-05-02T18:28:46.022Z",
+    "provider": "google",
+    "model": "gemini-2.5-flash",
+    "type": "prompt-enhance",
+    "prompt": "Cinematic hyperreal photograph, lone human silhouette shot from behind centered in frame, standing absolutely still, sur",
+    "styleHint": null,
+    "tokensIn": 787,
+    "tokensOut": 249,
+    "estimatedCost": 0.00013372499999999998
+  },
+  {
+    "id": "gen_1777746545420_mut5j4",
+    "createdAt": "2026-05-02T18:29:05.420Z",
+    "provider": "google",
+    "model": "imagen-4.0-ultra-generate-001",
+    "type": "image",
+    "slug": "gen-1777746533162",
+    "prompt": "Cinematic hyperreal photograph, lone human silhouette shot from behind centered in frame, standing absolutely still, surrounded by a slow swirling vortex of thousands of luminous golden-amber particles drifting in deep space, particles trailing soft motion blur, deep velvet blue-black void background fading to charcoal at edges, single rim light tracing the figure's shoulders from above-right, volumetric light shafts cutting through particle cloud, anamorphic lens 35mm, shallow depth of field, dust and atmospheric haze, color graded teal-amber, IMAX-grade detail, mood of stillness within chaos, premium editorial poster quality.",
+    "aspectRatio": "16:9",
+    "estimatedCost": 0.06,
+    "url": "/generated/gen-1777746533162.png"
   }
 ]
