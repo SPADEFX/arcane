@@ -1,0 +1,42 @@
+[
+  {
+    "id": "gen_1777698611434_5evgll",
+    "createdAt": "2026-05-02T05:10:11.434Z",
+    "provider": "local",
+    "model": "sharp/avif",
+    "type": "compression",
+    "slug": "test-imagen-avif-q80",
+    "sourceSlug": "test-imagen",
+    "format": "avif",
+    "quality": 80,
+    "originalSize": 1282744,
+    "compressedSize": 57197,
+    "savings": 96,
+    "estimatedCost": 0,
+    "url": "/generated/test-imagen-avif-q80.avif"
+  },
+  {
+    "id": "gen_1777742393883_w98d97",
+    "createdAt": "2026-05-02T17:19:53.883Z",
+    "provider": "google",
+    "model": "gemini-3-pro-image-preview",
+    "type": "image",
+    "slug": "gen-1777742373919",
+    "prompt": "A flawless, highly refractive clear glass cube rests perfectly centered upon an undulating, surreal pink desert landscape, dotted with bioluminescent flora, under a diffused twilight sky. Lit by gentle, volumetric global illumination, it casts subtle chromatic refractions. Rendered in Octane with physically-based glass materials and art-directed shading, emphasizing soft subsurface scattering on the landscape, evoking ethereal wonder in a wide, slightly low-angle shot.",
+    "aspectRatio": "16:9",
+    "estimatedCost": 0.134,
+    "url": "/generated/gen-1777742373919.png"
+  },
+  {
+    "id": "gen_1777744871843_a7v49q",
+    "createdAt": "2026-05-02T18:01:11.843Z",
+    "provider": "google",
+    "model": "gemini-2.5-flash",
+    "type": "prompt-enhance",
+    "prompt": "hero saas",
+    "styleHint": "3d",
+    "tokensIn": 697,
+    "tokensOut": 208,
+    "estimatedCost": 0.000114675
+  }
+]
