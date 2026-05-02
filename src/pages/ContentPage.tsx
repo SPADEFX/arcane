@@ -51,46 +51,53 @@ interface GeneratedAsset {
   aspectRatio?: string;
   estimatedCost?: number;
   createdAt: string;
+  sourceSlug?: string;
+  format?: string;
+  quality?: number;
+  savings?: number;
 }
 
-/* CSS for the compression animation — mosaic + scan + pixelate */
+/* CSS for the compression animation — strong blur pulse + scan line +
+   block grid overlay. Reliable: pure opacity / filter, no mix-blend-mode
+   tricks that could fight with the image. */
 const COMPRESS_ANIM_CSS = `
-@keyframes compress-pixelate {
-  0%, 100% { filter: contrast(1) saturate(1); transform: scale(1); }
-  35%      { filter: contrast(1.4) saturate(1.2) blur(2px); transform: scale(0.985); }
-  65%      { filter: contrast(0.9) saturate(0.85) blur(1.5px); transform: scale(1.005); }
+@keyframes compress-pulse {
+  0%, 100% { filter: blur(0px) contrast(1) saturate(1); }
+  35%      { filter: blur(6px) contrast(1.4) saturate(1.3); }
+  70%      { filter: blur(2px) contrast(0.92) saturate(0.85); }
 }
 .compressing-img {
-  animation: compress-pixelate 1.6s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
-  image-rendering: pixelated;
-  image-rendering: -moz-crisp-edges;
-  image-rendering: crisp-edges;
+  animation: compress-pulse 1.4s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
 }
 @keyframes compress-scan {
-  0%   { top: -10%; opacity: 0; }
-  10%  { opacity: 1; }
-  90%  { opacity: 1; }
-  100% { top: 110%; opacity: 0; }
+  0%   { top: -15%; opacity: 0; }
+  8%   { opacity: 1; }
+  92%  { opacity: 1; }
+  100% { top: 115%; opacity: 0; }
 }
-.compressing-scan::before {
-  content: "";
+.compressing-scan {
   position: absolute;
-  left: 0; right: 0; height: 64px;
-  background: linear-gradient(180deg, transparent 0%, rgba(66,133,244,0.1) 30%, rgba(66,133,244,0.55) 50%, rgba(66,133,244,0.1) 70%, transparent 100%);
-  filter: blur(0.5px);
-  animation: compress-scan 1.8s ease-in-out infinite;
+  left: 0; right: 0;
+  height: 72px;
+  background: linear-gradient(180deg,
+    transparent 0%,
+    rgba(66,133,244,0.08) 25%,
+    rgba(66,133,244,0.45) 50%,
+    rgba(66,133,244,0.08) 75%,
+    transparent 100%);
+  filter: blur(1px);
+  animation: compress-scan 1.6s ease-in-out infinite;
 }
-@keyframes compress-mosaic {
-  0%, 100% { opacity: 0.25; transform: scale(1); }
-  50%      { opacity: 0.55; transform: scale(1.02); }
+@keyframes compress-grid {
+  0%, 100% { opacity: 0.18; }
+  50%      { opacity: 0.40; }
 }
-.compressing-mosaic {
+.compressing-grid {
   background-image:
-    linear-gradient(rgba(66,133,244,0.18) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(66,133,244,0.18) 1px, transparent 1px);
-  background-size: 24px 24px;
-  mix-blend-mode: screen;
-  animation: compress-mosaic 1.4s ease-in-out infinite;
+    linear-gradient(rgba(66,133,244,0.5) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(66,133,244,0.5) 1px, transparent 1px);
+  background-size: 28px 28px;
+  animation: compress-grid 1.2s ease-in-out infinite;
 }
 `;
 
@@ -529,6 +536,7 @@ export function ContentPage() {
                   return (
                     <div
                       key={img.slug}
+                      data-asset-slug={img.slug}
                       className="group relative rounded-lg overflow-hidden border border-zinc-800 bg-zinc-900 hover:border-zinc-700 transition-colors"
                     >
                       {isVideo ? (
@@ -548,14 +556,38 @@ export function ContentPage() {
                           loading="lazy"
                         />
                       )}
-                      <div className="p-2.5 border-t border-zinc-800 flex items-center justify-between gap-2">
-                        <code className="block text-[11px] text-zinc-300 truncate" title={img.slug}>
-                          {img.slug}
-                        </code>
-                        {isVideo && (
-                          <span className="text-[9px] uppercase tracking-wider text-zinc-500 flex-shrink-0">
-                            video
-                          </span>
+                      <div className="p-2.5 border-t border-zinc-800 flex flex-col gap-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <code className="block text-[11px] text-zinc-300 truncate" title={img.slug}>
+                            {img.slug}
+                          </code>
+                          {isVideo && (
+                            <span className="text-[9px] uppercase tracking-wider text-zinc-500 flex-shrink-0">video</span>
+                          )}
+                          {img.type === "compression" && img.savings != null && (
+                            <span
+                              className="text-[10px] font-mono px-1.5 py-0.5 rounded flex-shrink-0"
+                              style={{ background: "#34d39922", color: "#34d399" }}
+                            >
+                              −{img.savings}%
+                            </span>
+                          )}
+                        </div>
+                        {img.sourceSlug && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const el = document.querySelector(`[data-asset-slug="${img.sourceSlug}"]`);
+                              el?.scrollIntoView({ behavior: "smooth", block: "center" });
+                            }}
+                            className="inline-flex items-center gap-1 text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors w-fit"
+                            title={`Source: ${img.sourceSlug}`}
+                          >
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M9 14l-4-4 4-4M5 10h11a4 4 0 014 4v6" />
+                            </svg>
+                            <code className="truncate" style={{ maxWidth: 140 }}>{img.sourceSlug}</code>
+                          </button>
                         )}
                       </div>
                       <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -745,12 +777,15 @@ function CompressPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{
+    slug: string;
+    sourceSlug: string;
     sourceUrl: string;
     url: string;
     originalSize: number;
     compressedSize: number;
     savings: number;
     format: string;
+    quality: number;
   } | null>(null);
 
   const sources = images.filter((i) => !i.url.endsWith(".mp4"));
@@ -780,16 +815,17 @@ function CompressPanel({
     setBusy(true);
     setError(null);
     setResult(null);
+    const minDuration = new Promise((r) => setTimeout(r, 1400));
     try {
-      const res = await fetch(`${API}/api/compress`, {
+      const apiCall = fetch(`${API}/api/compress`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ sourceSlug, format, quality }),
-      });
-      const json = await res.json();
+      }).then((r) => r.json());
+      // Show the animation for at least 1.4s even if sharp finishes in 200ms
+      const [json] = await Promise.all([apiCall, minDuration]);
       if (!json.ok) throw new Error(json.error || "Compression failed");
       setResult(json);
-      onChange();
     } catch (err) {
       setError(String((err as Error).message));
     } finally {
@@ -902,6 +938,36 @@ function CompressPanel({
             before={{ url: result.sourceUrl, label: "Base", bytes: result.originalSize, fmtBytes }}
             after={{ url: result.url, label: result.format.toUpperCase(), bytes: result.compressedSize, fmtBytes }}
             savings={result.savings}
+            onSave={async () => {
+              try {
+                const r = await fetch(`${API}/api/save-compression`, {
+                  method: "POST",
+                  headers: { "content-type": "application/json" },
+                  body: JSON.stringify({
+                    slug: result.slug,
+                    sourceSlug: result.sourceSlug,
+                    format: result.format,
+                    quality: result.quality,
+                    originalSize: result.originalSize,
+                    compressedSize: result.compressedSize,
+                    savings: result.savings,
+                  }),
+                });
+                const j = await r.json();
+                if (!j.ok) throw new Error(j.error);
+                navigator.clipboard.writeText(result.url);
+                onChange();
+                setResult(null);
+              } catch (e) {
+                alert(`Save failed: ${(e as Error).message}`);
+              }
+            }}
+            onDiscard={async () => {
+              try {
+                await fetch(`${API}/api/generated-images/${result.slug}`, { method: "DELETE" });
+              } catch {}
+              setResult(null);
+            }}
           />
         ) : (
           <CompressingPreview
@@ -943,12 +1009,19 @@ function CompressingPreview({
 
         {busy && (
           <>
-            {/* Scan sweep */}
-            <div className="compressing-scan pointer-events-none absolute inset-0" />
-            {/* Mosaic block dots — visual texture cue */}
-            <div className="compressing-mosaic pointer-events-none absolute inset-0" />
-            {/* Status */}
-            <div className="absolute bottom-3 left-3 right-3 flex items-center justify-center gap-2 text-[11px] text-white/70">
+            {/* Block grid texture — visible compression metaphor */}
+            <div className="compressing-grid pointer-events-none absolute inset-0" />
+            {/* Scan sweep — moves vertically through the image */}
+            <div className="compressing-scan pointer-events-none" />
+            {/* Status pill */}
+            <div
+              className="absolute bottom-3 left-1/2 -translate-x-1/2 inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] text-white/90"
+              style={{
+                background: "rgba(0, 0, 0, 0.6)",
+                backdropFilter: "blur(8px)",
+                border: "1px solid rgba(66,133,244,0.3)",
+              }}
+            >
               <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse" />
               Encoding…
             </div>
@@ -962,11 +1035,13 @@ function CompressingPreview({
 /* ─── Before/After slider — drag to reveal ────────────────────────────── */
 
 function BeforeAfterSlider({
-  before, after, savings,
+  before, after, savings, onSave, onDiscard,
 }: {
   before: { url: string; label: string; bytes: number; fmtBytes: (n: number) => string };
   after: { url: string; label: string; bytes: number; fmtBytes: (n: number) => string };
   savings: number;
+  onSave?: () => void | Promise<void>;
+  onDiscard?: () => void | Promise<void>;
 }) {
   const [pos, setPos] = useState(50);
   const [dragging, setDragging] = useState(false);
@@ -1074,6 +1149,31 @@ function BeforeAfterSlider({
           {after.label}
         </div>
       </div>
+
+      {/* Action bar — only shown if save/discard provided */}
+      {(onSave || onDiscard) && (
+        <div className="border-t border-zinc-800 p-3 flex items-center justify-end gap-2">
+          {onDiscard && (
+            <button
+              onClick={() => onDiscard()}
+              className="px-3 py-2 rounded-lg text-[12px] font-medium text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] transition-colors"
+            >
+              Discard
+            </button>
+          )}
+          {onSave && (
+            <button
+              onClick={() => onSave()}
+              className="px-4 py-2 rounded-lg text-[12px] font-medium bg-emerald-500 hover:bg-emerald-600 text-white transition-colors inline-flex items-center gap-2"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 12l5 5L20 7" />
+              </svg>
+              Save & Copy URL
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

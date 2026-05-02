@@ -1249,17 +1249,41 @@ async function handleListGenerated(req, res) {
     const studioRoot = path.join(__dirname, "..");
     const dir = path.join(studioRoot, "public", "generated");
     if (!fs.existsSync(dir)) return sendJson(res, 200, { ok: true, images: [] });
+
+    // Read ledger so we can attach sourceSlug + ledger metadata to each file
+    const { readLedger } = require("./lib/ledger");
+    const ledger = readLedger();
+    const ledgerBySlug = {};
+    for (const e of ledger) ledgerBySlug[e.slug] = e;
+
     const files = await fs.promises.readdir(dir);
     const images = [];
+    const exts = [".png", ".webp", ".avif", ".jpeg", ".jpg", ".mp4"];
     for (const f of files) {
-      if (!f.endsWith(".png")) continue;
+      if (f.startsWith(".")) continue;
+      const ext = exts.find((e) => f.endsWith(e));
+      if (!ext) continue;
       const full = path.join(dir, f);
       const stat = await fs.promises.stat(full);
+      const slug = f.slice(0, -ext.length);
+      const ledgerEntry = ledgerBySlug[slug];
+
+      // Skip files that exist on disk but aren't logged in the ledger AND
+      // aren't .png — these are typically compression previews not yet saved
+      if (!ledgerEntry && ext !== ".png") continue;
+
       images.push({
-        slug: f.replace(/\.png$/, ""),
+        slug,
         url: `/generated/${f}`,
         size: stat.size,
-        createdAt: stat.mtime.toISOString(),
+        createdAt: ledgerEntry?.createdAt || stat.mtime.toISOString(),
+        type: ledgerEntry?.type,
+        provider: ledgerEntry?.provider,
+        model: ledgerEntry?.model,
+        sourceSlug: ledgerEntry?.sourceSlug,
+        format: ledgerEntry?.format,
+        quality: ledgerEntry?.quality,
+        savings: ledgerEntry?.savings,
       });
     }
     images.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
@@ -1273,14 +1297,21 @@ async function handleDeleteGenerated(req, res) {
   const slug = decodeURIComponent(req.url.replace(/^\/api\/generated-images\//, ""));
   if (!slug || /[/\\]/.test(slug)) return sendJson(res, 400, { error: "invalid slug" });
   const studioRoot = path.join(__dirname, "..");
-  const file = path.join(studioRoot, "public", "generated", `${slug}.png`);
-  try {
-    await fs.promises.unlink(file);
-    sendJson(res, 200, { ok: true, slug });
-  } catch (e) {
-    if (e.code === "ENOENT") return sendJson(res, 404, { error: "not found" });
-    sendJson(res, 500, { error: String(e.message || e) });
+  const dir = path.join(studioRoot, "public", "generated");
+  // Try every supported extension
+  const exts = ["png", "webp", "avif", "jpeg", "jpg", "mp4"];
+  let removed = false;
+  for (const ext of exts) {
+    const file = path.join(dir, `${slug}.${ext}`);
+    try {
+      await fs.promises.unlink(file);
+      removed = true;
+    } catch (e) {
+      if (e.code !== "ENOENT") throw e;
+    }
   }
+  if (!removed) return sendJson(res, 404, { error: "not found" });
+  sendJson(res, 200, { ok: true, slug });
 }
 
 /* ─── Image compression via sharp ─────────────────────────────────────── */
@@ -1336,7 +1367,48 @@ async function handleCompress(req, res) {
         savings: Math.round(((originalSize - compressedSize) / originalSize) * 100),
         sourceSlug,
         sourceUrl: `/generated/${path.basename(srcPath)}`,
+        // Mark as preview — frontend explicitly /save-compression to keep it
+        preview: true,
       });
+    } catch (e) {
+      sendJson(res, 500, { error: String(e.message || e) });
+    }
+  });
+}
+
+/* Persist a previewed compression — logs it to the ledger so it shows
+   up in Recent + usage stats. The file already exists on disk from /api/compress. */
+async function handleSaveCompression(req, res) {
+  let body = "";
+  req.on("data", (c) => { body += c; if (body.length > 1e5) req.destroy(); });
+  req.on("end", async () => {
+    try {
+      const { slug, sourceSlug, format, quality, originalSize, compressedSize, savings } = JSON.parse(body);
+      if (!slug) return sendJson(res, 400, { error: "missing slug" });
+
+      const studioRoot = path.join(__dirname, "..");
+      const filePath = path.join(studioRoot, "public", "generated", `${slug}.${format}`);
+      if (!fs.existsSync(filePath)) {
+        return sendJson(res, 404, { error: "compressed file no longer on disk" });
+      }
+
+      const { append } = require("./lib/ledger");
+      await append({
+        provider: "local",
+        model: `sharp/${format}`,
+        type: "compression",
+        slug,
+        sourceSlug: sourceSlug || null,
+        format,
+        quality,
+        originalSize,
+        compressedSize,
+        savings,
+        estimatedCost: 0,
+        url: `/generated/${slug}.${format}`,
+      });
+
+      sendJson(res, 200, { ok: true, slug, url: `/generated/${slug}.${format}` });
     } catch (e) {
       sendJson(res, 500, { error: String(e.message || e) });
     }
@@ -1410,6 +1482,7 @@ const server = http.createServer((req, res) => {
     return sendJson(res, 200, { ok: true, usage: getUsage() });
   }
   if (req.method === "POST" && req.url === "/api/compress") return handleCompress(req, res);
+  if (req.method === "POST" && req.url === "/api/save-compression") return handleSaveCompression(req, res);
   if (req.method === "POST" && req.url === "/api/export-site") return handleExportSite(req, res);
   if (req.method === "GET" && req.url === "/api/progress") return handleProgress(req, res);
   if (req.method === "GET" && req.url.startsWith("/api/clone-files")) return handleCloneFiles(req, res);
