@@ -9,6 +9,7 @@
  * Tabs route the form to the right model family.
  */
 import { useEffect, useMemo, useState, useCallback } from "react";
+import * as db from "@/lib/db";
 
 const API = "http://localhost:3000";
 
@@ -52,13 +53,14 @@ interface GeneratedAsset {
   createdAt: string;
 }
 
-type Tab = "image" | "video" | "image-to-video" | "image-to-image";
+type Tab = "image" | "video" | "image-to-video" | "image-to-image" | "compress";
 
 const TABS: { id: Tab; label: string; modelTypes: string[] }[] = [
   { id: "image", label: "Image", modelTypes: ["image"] },
   { id: "video", label: "Video", modelTypes: ["video"] },
   { id: "image-to-video", label: "Image → Video", modelTypes: ["image-to-video"] },
-  { id: "image-to-image", label: "Edit Image", modelTypes: ["image"] }, // uses image models with sourceImage
+  { id: "image-to-image", label: "Edit Image", modelTypes: ["image"] },
+  { id: "compress", label: "Compress", modelTypes: [] },
 ];
 
 /* ─── Provider brand colors ──────────────────────────────────────────── */
@@ -164,6 +166,26 @@ export function ContentPage() {
       const json = await res.json();
       if (!json.ok) throw new Error(json.error || "Generation failed");
       setLatest(json);
+
+      // Mirror to IndexedDB — same data lives in ledger.json server-side,
+      // this gives the client a persistent local index that survives restarts.
+      try {
+        await db.put("generated_assets", {
+          slug: json.slug,
+          url: json.url,
+          provider: json.provider,
+          model: json.model,
+          type: json.type,
+          prompt: prompt.trim(),
+          aspectRatio,
+          estimatedCost: json.estimatedCost,
+          createdAt: json.createdAt,
+          sourceImageSlug: sourceImageSlug || null,
+        });
+      } catch (e) {
+        console.warn("[content] IDB save failed:", e);
+      }
+
       refresh();
     } catch (err) {
       setError(String((err as Error).message));
@@ -190,7 +212,7 @@ export function ContentPage() {
   return (
     <div className="flex h-full flex-col bg-zinc-950 text-zinc-100">
       {/* ── STICKY HEADER ─────────────────────────────────────────── */}
-      <ProviderHeader usage={usage} />
+      <ProviderHeader usage={usage} models={models} />
 
       <div className="flex-1 overflow-y-auto overscroll-contain">
         <div className="mx-auto p-8" style={{ maxWidth: 1280 }}>
@@ -219,7 +241,13 @@ export function ContentPage() {
             ))}
           </div>
 
-          {/* Form + preview */}
+          {/* Compression tab — totally different surface */}
+          {tab === "compress" && (
+            <CompressPanel images={history} onChange={refresh} />
+          )}
+
+          {/* Generation tabs */}
+          {tab !== "compress" && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12">
             <form onSubmit={handleGenerate} className="space-y-5">
               {/* Source image (only for img-to-* tabs) */}
@@ -307,13 +335,15 @@ export function ContentPage() {
                         >
                           <div className="flex items-center gap-2 mb-1">
                             <span
-                              className="block w-2 h-2 rounded-full"
-                              style={{ background: brand.accent }}
-                            />
+                              className="flex items-center justify-center flex-shrink-0"
+                              style={{ width: 16, height: 16 }}
+                            >
+                              {m.provider === "fal" ? <FalLogo /> : <GoogleLogo />}
+                            </span>
                             <span className="text-[13px] font-medium flex-1 truncate">{m.name}</span>
                             <span className="text-[11px] text-zinc-500 font-mono">${price.toFixed(3)}</span>
                           </div>
-                          <span className="block text-[11px] text-zinc-500 leading-relaxed pl-4">
+                          <span className="block text-[11px] text-zinc-500 leading-relaxed" style={{ paddingLeft: 24 }}>
                             {m.description}
                           </span>
                         </button>
@@ -435,6 +465,7 @@ export function ContentPage() {
               )}
             </div>
           </div>
+          )}
 
           {/* History */}
           <div>
@@ -522,112 +553,360 @@ export function ContentPage() {
 
 /* ─── Provider header — sticky brand cards with live usage ────────────── */
 
-function ProviderHeader({ usage }: { usage: Usage | null }) {
+function ProviderHeader({ usage, models }: { usage: Usage | null; models: Record<string, Model> }) {
   const google = usage?.byProvider.google || { count: 0, cost: 0 };
   const fal = usage?.byProvider.fal || { count: 0, cost: 0 };
-  const total = usage?.total || { count: 0, cost: 0 };
 
   return (
     <div
       className="sticky top-0 z-30 border-b border-zinc-800 backdrop-blur"
-      style={{
-        background: "rgba(9, 9, 11, 0.85)",
-      }}
+      style={{ background: "rgba(9, 9, 11, 0.85)" }}
     >
-      <div className="mx-auto px-8 py-4 flex items-center gap-4" style={{ maxWidth: 1280 }}>
-        <ProviderCard
-          label="Google AI"
-          accent={BRAND.google.accent}
-          gradient={BRAND.google.gradient}
+      <div className="mx-auto px-8 py-3 flex items-center gap-3" style={{ maxWidth: 1280 }}>
+        <ProviderPill
+          providerId="google"
           stats={google}
-          icon={
-            <svg viewBox="0 0 48 48" width="20" height="20">
-              <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z" />
-              <path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z" />
-              <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z" />
-              <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z" />
-            </svg>
-          }
+          icon={<GoogleLogo />}
+          usage={usage}
+          models={models}
         />
-
-        <ProviderCard
-          label="fal.ai"
-          accent={BRAND.fal.accent}
-          gradient={BRAND.fal.gradient}
+        <ProviderPill
+          providerId="fal"
           stats={fal}
-          icon={
-            <svg viewBox="0 0 1855 1855" width="20" height="20">
-              <path
-                fillRule="evenodd"
-                clipRule="evenodd"
-                d="M1181.65 78C1212.05 78 1236.42 101.947 1239.32 131.261C1265.25 392.744 1480.07 600.836 1750.02 625.948C1780.28 628.764 1805 652.366 1805 681.816V1174.18C1805 1203.63 1780.28 1227.24 1750.02 1230.05C1480.07 1255.16 1265.25 1463.26 1239.32 1724.74C1236.42 1754.05 1212.05 1778 1181.65 1778H673.354C642.951 1778 618.585 1754.05 615.678 1724.74C589.754 1463.26 374.927 1255.16 104.984 1230.05C74.7212 1227.24 50 1203.63 50 1174.18V681.816C50 652.366 74.7213 628.764 104.984 625.948C374.927 600.836 589.754 392.744 615.678 131.261C618.585 101.946 642.951 78 673.353 78H1181.65ZM402.377 926.561C402.377 1209.41 638.826 1438.71 930.501 1438.71C1222.18 1438.71 1458.62 1209.41 1458.62 926.561C1458.62 643.709 1222.18 414.412 930.501 414.412C638.826 414.412 402.377 643.709 402.377 926.561Z"
-                fill="#EC0648"
-              />
-            </svg>
-          }
+          icon={<FalLogo />}
+          usage={usage}
+          models={models}
         />
-
-        {/* Total */}
-        <div className="ml-auto flex items-center gap-3 pl-4 border-l border-zinc-800">
-          <div className="text-right">
-            <div className="text-[10px] uppercase tracking-[0.18em] text-zinc-500 font-medium">
-              Total spent
-            </div>
-            <div className="text-[14px] text-zinc-100 font-mono tabular-nums">
-              ${total.cost.toFixed(2)}
-            </div>
-          </div>
-          <div className="text-right border-l border-zinc-800 pl-3">
-            <div className="text-[10px] uppercase tracking-[0.18em] text-zinc-500 font-medium">
-              Generations
-            </div>
-            <div className="text-[14px] text-zinc-100 font-mono tabular-nums">
-              {total.count}
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );
 }
 
-function ProviderCard({
-  label, accent, gradient, stats, icon,
+function ProviderPill({
+  providerId, stats, icon, usage, models,
 }: {
-  label: string;
-  accent: string;
-  gradient: string;
+  providerId: "google" | "fal";
   stats: UsageBucket;
   icon: React.ReactNode;
+  usage: Usage | null;
+  models: Record<string, Model>;
 }) {
+  const [hovering, setHovering] = useState(false);
+
+  // Filter usage breakdown to this provider's models
+  const providerModels = Object.entries(usage?.byModel || {})
+    .filter(([modelId]) => models[modelId]?.provider === providerId)
+    .sort(([, a], [, b]) => b.cost - a.cost);
+
+  const today = usage
+    ? Object.entries(usage.byDay)
+        .filter(([day]) => day === new Date().toISOString().slice(0, 10))
+        .reduce((sum, [, b]) => sum + b.cost, 0)
+    : 0;
+
   return (
     <div
-      className="flex items-center gap-3 rounded-lg px-3 py-2 border"
-      style={{
-        background: `linear-gradient(135deg, ${accent}08 0%, transparent 100%)`,
-        borderColor: `${accent}33`,
-      }}
+      className="relative"
+      onMouseEnter={() => setHovering(true)}
+      onMouseLeave={() => setHovering(false)}
     >
       <div
-        className="flex-shrink-0 flex items-center justify-center rounded-md"
-        style={{
-          width: 32,
-          height: 32,
-          background: gradient,
-        }}
+        className={`inline-flex items-center gap-2.5 rounded-full px-3 py-1.5 transition-colors cursor-default ${
+          hovering ? "bg-white/[0.06]" : "bg-transparent"
+        }`}
       >
         {icon}
+        <span className="text-[13px] text-zinc-300 font-mono tabular-nums">
+          ${stats.cost.toFixed(2)}
+        </span>
       </div>
-      <div>
-        <div className="text-[11px] font-medium" style={{ color: accent }}>
-          {label}
+
+      {hovering && (
+        <div
+          className="absolute top-full left-0 mt-2 z-40 rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl p-3"
+          style={{ minWidth: 280 }}
+        >
+          {/* Top stats row */}
+          <div className="grid grid-cols-3 gap-3 pb-3 border-b border-zinc-800">
+            <Stat label="Today" value={`$${today.toFixed(2)}`} />
+            <Stat label="Generations" value={stats.count.toString()} />
+            <Stat label="All-time" value={`$${stats.cost.toFixed(2)}`} />
+          </div>
+
+          {/* Model breakdown */}
+          {providerModels.length === 0 ? (
+            <div className="pt-3 text-[11px] text-zinc-600">
+              No generations yet.
+            </div>
+          ) : (
+            <div className="pt-3 space-y-1.5">
+              <div className="text-[10px] uppercase tracking-[0.18em] text-zinc-600 font-medium mb-1">
+                By model
+              </div>
+              {providerModels.map(([modelId, mb]) => {
+                const meta = models[modelId];
+                return (
+                  <div key={modelId} className="flex items-center justify-between gap-3 text-[12px]">
+                    <span className="text-zinc-300 truncate">{meta?.name || modelId}</span>
+                    <span className="flex items-center gap-2 flex-shrink-0">
+                      <span className="text-zinc-500 font-mono tabular-nums text-[11px]">×{mb.count}</span>
+                      <span className="text-zinc-200 font-mono tabular-nums">${mb.cost.toFixed(3)}</span>
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
-        <div className="flex items-baseline gap-3 text-zinc-100">
-          <span className="text-[12px] font-mono tabular-nums">{stats.count}</span>
-          <span className="text-[10px] text-zinc-500">·</span>
-          <span className="text-[12px] font-mono tabular-nums">${stats.cost.toFixed(2)}</span>
+      )}
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="text-[9px] uppercase tracking-[0.18em] text-zinc-600 font-medium">{label}</div>
+      <div className="text-[13px] text-zinc-100 font-mono tabular-nums mt-0.5">{value}</div>
+    </div>
+  );
+}
+
+function GoogleLogo() {
+  // Gemini sparkle in single brand-blue (matches the "Google AI" tooling)
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="#4285F4">
+      <path d="M12 0 C12 7 14 10 22 12 C14 14 12 17 12 24 C12 17 10 14 2 12 C10 10 12 7 12 0 Z" />
+    </svg>
+  );
+}
+
+/* ─── Compress panel — sharp-backed image compression ─────────────────── */
+
+const FORMATS = [
+  { value: "webp", label: "WebP", note: "best general-purpose, ~80% smaller than PNG" },
+  { value: "avif", label: "AVIF", note: "~50% smaller than WebP, slower encoding" },
+  { value: "jpeg", label: "JPEG", note: "universal, lossy" },
+  { value: "png", label: "PNG", note: "lossless re-compression" },
+];
+
+function CompressPanel({
+  images,
+  onChange,
+}: {
+  images: GeneratedAsset[];
+  onChange: () => void;
+}) {
+  const [sourceSlug, setSourceSlug] = useState<string>("");
+  const [format, setFormat] = useState("webp");
+  const [quality, setQuality] = useState(80);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<{
+    sourceUrl: string;
+    url: string;
+    originalSize: number;
+    compressedSize: number;
+    savings: number;
+    format: string;
+  } | null>(null);
+
+  const sources = images.filter((i) => !i.url.endsWith(".mp4"));
+
+  function fmtBytes(n: number) {
+    if (n < 1024) return `${n} B`;
+    if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+    return `${(n / (1024 * 1024)).toFixed(2)} MB`;
+  }
+
+  async function handleCompress() {
+    if (!sourceSlug || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API}/api/compress`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ sourceSlug, format, quality }),
+      });
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error || "Compression failed");
+      setResult(json);
+      onChange();
+    } catch (err) {
+      setError(String((err as Error).message));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6 mb-12">
+      {/* Controls */}
+      <div className="space-y-5">
+        <div>
+          <label className="block text-[11px] font-medium uppercase tracking-[0.18em] text-zinc-500 mb-2">
+            Source image
+          </label>
+          {sources.length === 0 ? (
+            <div className="text-[12px] text-zinc-600 bg-zinc-900 border border-zinc-800 rounded-lg p-3">
+              Generate an image first.
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-2 max-h-[260px] overflow-y-auto">
+              {sources.map((img) => (
+                <button
+                  key={img.slug}
+                  type="button"
+                  onClick={() => setSourceSlug(img.slug)}
+                  className={`rounded-md border-2 overflow-hidden transition-colors aspect-square ${
+                    sourceSlug === img.slug
+                      ? "border-zinc-400"
+                      : "border-zinc-800 hover:border-zinc-700"
+                  }`}
+                >
+                  <img src={img.url} alt="" className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
+
+        <div>
+          <label className="block text-[11px] font-medium uppercase tracking-[0.18em] text-zinc-500 mb-2">
+            Format
+          </label>
+          <div className="space-y-1.5">
+            {FORMATS.map((f) => (
+              <button
+                key={f.value}
+                type="button"
+                onClick={() => setFormat(f.value)}
+                className={`w-full text-left rounded-lg border p-2.5 transition-colors ${
+                  format === f.value
+                    ? "bg-zinc-800/60 border-zinc-600"
+                    : "bg-zinc-900 border-zinc-800 hover:border-zinc-700"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[13px] font-medium text-zinc-100">{f.label}</span>
+                  <code className="text-[10px] text-zinc-500">.{f.value}</code>
+                </div>
+                <div className="text-[10px] text-zinc-500 mt-0.5">{f.note}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="block text-[11px] font-medium uppercase tracking-[0.18em] text-zinc-500">
+              Quality
+            </label>
+            <span className="text-[12px] text-zinc-300 font-mono tabular-nums">{quality}</span>
+          </div>
+          <input
+            type="range"
+            min="10"
+            max="100"
+            value={quality}
+            onChange={(e) => setQuality(Number(e.target.value))}
+            className="w-full accent-blue-500"
+          />
+          <div className="flex justify-between text-[10px] text-zinc-600 mt-1">
+            <span>smaller</span>
+            <span>better</span>
+          </div>
+        </div>
+
+        <button
+          onClick={handleCompress}
+          disabled={!sourceSlug || busy}
+          className="w-full px-4 py-2.5 rounded-lg bg-blue-500 text-white text-[13px] font-medium hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >
+          {busy ? "Compressing…" : "Compress"}
+        </button>
+
+        {error && (
+          <div className="rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2.5 text-[12px] text-red-400">
+            {error}
+          </div>
+        )}
+      </div>
+
+      {/* Before / After comparison */}
+      <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 overflow-hidden">
+        {!result ? (
+          <div className="flex items-center justify-center text-[12px] text-zinc-600 px-6 py-32 text-center">
+            Pick an image, choose a format, and hit Compress to see the before/after.
+          </div>
+        ) : (
+          <div>
+            <div className="grid grid-cols-2 divide-x divide-zinc-800">
+              <CompareCell label="Original" url={result.sourceUrl} bytes={result.originalSize} fmtBytes={fmtBytes} />
+              <CompareCell
+                label={`${result.format.toUpperCase()} q${quality}`}
+                url={result.url}
+                bytes={result.compressedSize}
+                fmtBytes={fmtBytes}
+                accent
+              />
+            </div>
+            <div className="border-t border-zinc-800 p-3 flex items-center justify-between">
+              <span className="text-[12px] text-zinc-500">
+                Savings:{" "}
+                <span className="text-emerald-400 font-mono tabular-nums">
+                  {result.savings > 0 ? `${result.savings}%` : "—"}
+                </span>
+              </span>
+              <button
+                onClick={() => navigator.clipboard.writeText(result.url)}
+                className="text-[11px] px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300"
+              >
+                Copy URL
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
+  );
+}
+
+function CompareCell({
+  label, url, bytes, fmtBytes, accent,
+}: {
+  label: string;
+  url: string;
+  bytes: number;
+  fmtBytes: (n: number) => string;
+  accent?: boolean;
+}) {
+  return (
+    <div className="flex flex-col">
+      <div
+        className="px-3 py-2 flex items-center justify-between text-[11px] uppercase tracking-[0.18em]"
+        style={{ color: accent ? "#34d399" : "#71717a" }}
+      >
+        <span>{label}</span>
+        <span className="font-mono tabular-nums">{fmtBytes(bytes)}</span>
+      </div>
+      <div className="bg-[#0a0a0a] flex items-center justify-center" style={{ minHeight: 320 }}>
+        <img src={url} alt="" className="max-w-full max-h-[420px] object-contain" />
+      </div>
+    </div>
+  );
+}
+
+function FalLogo() {
+  return (
+    <svg viewBox="0 0 1855 1855" width="18" height="18">
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M1181.65 78C1212.05 78 1236.42 101.947 1239.32 131.261C1265.25 392.744 1480.07 600.836 1750.02 625.948C1780.28 628.764 1805 652.366 1805 681.816V1174.18C1805 1203.63 1780.28 1227.24 1750.02 1230.05C1480.07 1255.16 1265.25 1463.26 1239.32 1724.74C1236.42 1754.05 1212.05 1778 1181.65 1778H673.354C642.951 1778 618.585 1754.05 615.678 1724.74C589.754 1463.26 374.927 1255.16 104.984 1230.05C74.7212 1227.24 50 1203.63 50 1174.18V681.816C50 652.366 74.7213 628.764 104.984 625.948C374.927 600.836 589.754 392.744 615.678 131.261C618.585 101.946 642.951 78 673.353 78H1181.65ZM402.377 926.561C402.377 1209.41 638.826 1438.71 930.501 1438.71C1222.18 1438.71 1458.62 1209.41 1458.62 926.561C1458.62 643.709 1222.18 414.412 930.501 414.412C638.826 414.412 402.377 643.709 402.377 926.561Z"
+        fill="#EC0648"
+      />
+    </svg>
   );
 }

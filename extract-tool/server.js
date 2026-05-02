@@ -1283,6 +1283,66 @@ async function handleDeleteGenerated(req, res) {
   }
 }
 
+/* ─── Image compression via sharp ─────────────────────────────────────── */
+async function handleCompress(req, res) {
+  let body = "";
+  req.on("data", (c) => { body += c; if (body.length > 1e5) req.destroy(); });
+  req.on("end", async () => {
+    try {
+      const { sourceSlug, format = "webp", quality = 80 } = JSON.parse(body);
+      if (!sourceSlug) return sendJson(res, 400, { error: "missing sourceSlug" });
+      if (!["webp", "avif", "jpeg", "png"].includes(format)) {
+        return sendJson(res, 400, { error: `unsupported format: ${format}` });
+      }
+      const q = Math.max(1, Math.min(100, Number(quality) || 80));
+
+      const studioRoot = path.join(__dirname, "..");
+      const dir = path.join(studioRoot, "public", "generated");
+
+      // Find the source — try both .png and .jpg
+      let srcPath = path.join(dir, `${sourceSlug}.png`);
+      if (!fs.existsSync(srcPath)) srcPath = path.join(dir, `${sourceSlug}.jpg`);
+      if (!fs.existsSync(srcPath)) {
+        return sendJson(res, 404, { error: `source not found: ${sourceSlug}` });
+      }
+
+      const sharp = require("sharp");
+      const sourceStat = await fs.promises.stat(srcPath);
+      const originalSize = sourceStat.size;
+
+      let pipeline = sharp(srcPath);
+      if (format === "webp") pipeline = pipeline.webp({ quality: q });
+      else if (format === "avif") pipeline = pipeline.avif({ quality: q });
+      else if (format === "jpeg") pipeline = pipeline.jpeg({ quality: q });
+      else if (format === "png") pipeline = pipeline.png({ quality: q, compressionLevel: 9 });
+
+      const outSlug = `${sourceSlug}-${format}-q${q}`;
+      const outPath = path.join(dir, `${outSlug}.${format}`);
+      const tmp = outPath + ".tmp";
+      await pipeline.toFile(tmp);
+      await fs.promises.rename(tmp, outPath);
+
+      const compressedStat = await fs.promises.stat(outPath);
+      const compressedSize = compressedStat.size;
+
+      sendJson(res, 200, {
+        ok: true,
+        slug: outSlug,
+        url: `/generated/${outSlug}.${format}`,
+        format,
+        quality: q,
+        originalSize,
+        compressedSize,
+        savings: Math.round(((originalSize - compressedSize) / originalSize) * 100),
+        sourceSlug,
+        sourceUrl: `/generated/${path.basename(srcPath)}`,
+      });
+    } catch (e) {
+      sendJson(res, 500, { error: String(e.message || e) });
+    }
+  });
+}
+
 async function handleExportSite(req, res) {
   let body = "";
   req.on("data", (c) => { body += c; });
@@ -1349,6 +1409,7 @@ const server = http.createServer((req, res) => {
     const { getUsage } = require("./lib/ledger");
     return sendJson(res, 200, { ok: true, usage: getUsage() });
   }
+  if (req.method === "POST" && req.url === "/api/compress") return handleCompress(req, res);
   if (req.method === "POST" && req.url === "/api/export-site") return handleExportSite(req, res);
   if (req.method === "GET" && req.url === "/api/progress") return handleProgress(req, res);
   if (req.method === "GET" && req.url.startsWith("/api/clone-files")) return handleCloneFiles(req, res);

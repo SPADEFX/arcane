@@ -1,5 +1,5 @@
 const DB_NAME = "arcane";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 let cachedDb: IDBDatabase | null = null;
 
@@ -20,6 +20,15 @@ function open(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains("captures")) {
         const store = db.createObjectStore("captures", { keyPath: "id" });
         store.createIndex("status", "status", { unique: false });
+      }
+      // v3 — generated content metadata mirror (files stay on disk, this
+      // is the client-side index for fast lookups + persistence)
+      if (!db.objectStoreNames.contains("generated_assets")) {
+        const store = db.createObjectStore("generated_assets", { keyPath: "slug" });
+        store.createIndex("provider", "provider", { unique: false });
+        store.createIndex("model", "model", { unique: false });
+        store.createIndex("type", "type", { unique: false });
+        store.createIndex("createdAt", "createdAt", { unique: false });
       }
     };
     req.onsuccess = () => { cachedDb = req.result; resolve(cachedDb); };
